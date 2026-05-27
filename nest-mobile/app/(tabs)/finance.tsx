@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, ScrollView, StatusBar, SafeAreaView, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
 import { BalanceSection } from '@/components/wallet/BalanceSection';
 import { PaymentWidget } from '@/components/wallet/PaymentWidget';
 import { TransactionList } from '@/components/wallet/TransactionList';
 import { COLORS } from '@/constants/theme';
+import { useNotificationsStore } from '@/stores/notifications-store';
 
 // Mock Data (Can be moved to a service later)
 const NEXT_PAYMENT = {
@@ -23,16 +25,25 @@ const TRANSACTIONS = [
 ];
 
 export default function SplitSheetWallet() {
+  const router = useRouter();
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+
+  useEffect(() => {
+    void fetchUnreadCount();
+  }, [fetchUnreadCount]);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background.base} />
-      
+
       {/* Top Section (Dark) */}
       <View style={styles.topSection}>
         <SafeAreaView>
-          <DashboardHeader 
+          <DashboardHeader
             avatarUrl="https://i.pravatar.cc/150?u=a042581f4e29026024d"
-            onMenuPress={() => console.log('Open Menu')}
+            hasUnread={unreadCount > 0}
+            onMenuPress={() => router.push('/notifications' as never)}
           />
           <BalanceSection />
         </SafeAreaView>

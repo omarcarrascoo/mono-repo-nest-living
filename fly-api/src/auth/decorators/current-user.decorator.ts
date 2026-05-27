@@ -1,9 +1,11 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
+export type Role = 'admin' | 'user' | 'kitchen_operator';
+
 export interface CurrentUserPayload {
   userId: string;
   email: string;
-  role: 'admin' | 'user';
+  role: Role;
   residencyId: string;
 }
 

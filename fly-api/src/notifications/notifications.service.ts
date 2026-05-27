@@ -120,6 +120,73 @@ export class NotificationsService {
     );
   }
 
+  /**
+   * Fan-out to admins + kitchen_operators in a residency. Used for
+   * order-side alerts (new pedido, escalations, etc.).
+   */
+  async notifyOrderStaff(residencyId: string, payload: NotifyPayload) {
+    const staff = await this.usersService.findStaffByResidency(residencyId);
+    await Promise.all(
+      staff.map((u) => this.notifyUser(String(u._id), payload)),
+    );
+  }
+
+  // ============================================================
+  // In-app inbox
+  // ============================================================
+  async listForUser(
+    userId: string,
+    opts: { unreadOnly?: boolean; limit?: number } = {},
+  ) {
+    const filter: Record<string, any> = {
+      userId: new Types.ObjectId(userId),
+      inbox: true,
+    };
+    if (opts.unreadOnly) filter.read = false;
+    return this.logModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(opts.limit ?? 100)
+      .lean()
+      .exec();
+  }
+
+  async getUnreadCount(userId: string) {
+    return this.logModel.countDocuments({
+      userId: new Types.ObjectId(userId),
+      inbox: true,
+      read: false,
+    });
+  }
+
+  async markRead(userId: string, notificationId: string) {
+    if (!Types.ObjectId.isValid(notificationId)) {
+      throw new NotFoundException('Notification not found');
+    }
+    const updated = await this.logModel.findOneAndUpdate(
+      {
+        _id: notificationId,
+        userId: new Types.ObjectId(userId),
+      },
+      { read: true, readAt: new Date() },
+      { new: true },
+    );
+    if (!updated) throw new NotFoundException('Notification not found');
+    return updated;
+  }
+
+  async markAllRead(userId: string) {
+    const result = await this.logModel.updateMany(
+      {
+        userId: new Types.ObjectId(userId),
+        inbox: true,
+        read: false,
+      },
+      { read: true, readAt: new Date() },
+    );
+    return { modified: result.modifiedCount };
+  }
+
   // ============================================================
   // Reservation hooks
   // ============================================================

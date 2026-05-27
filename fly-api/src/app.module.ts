@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DeliveryModule } from './delivery/delivery.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AmenitiesModule,
     ReservationsModule,
     NotificationsModule,
+    DeliveryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

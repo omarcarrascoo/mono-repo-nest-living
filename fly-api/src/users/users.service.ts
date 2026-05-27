@@ -30,6 +30,14 @@ export class UsersService {
       .exec() as unknown as User[];
   }
 
+  async findStaffByResidency(residencyId: string): Promise<User[]> {
+    return this.userModel
+      .find({ residencyId, role: { $in: ['admin', 'kitchen_operator'] } })
+      .select('_id email fullName role')
+      .lean()
+      .exec() as unknown as User[];
+  }
+
   async getFavoriteIds(userId: string): Promise<string[]> {
     const user = await this.userModel
       .findById(userId)

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, SafeAreaView, StatusBar, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { ToggleRow } from '@/components/ui/ToggleRow';
 import { FeedComposer } from '@/components/feed/FeedComposer';
 import { FeaturedCard } from '@/components/feed/FeaturedCard';
@@ -10,6 +11,7 @@ import { COLORS, THEME } from '@/constants/theme';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { FeaturedPostData, FeedPostData } from '@/types/feed';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
+import { useNotificationsStore } from '@/stores/notifications-store';
 
 
 
@@ -59,17 +61,26 @@ const FEED_DATA: FeedPostData[] = [
 ];
 
 export default function FeedUnifiedScreen() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('Todos');
+
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+
+  useEffect(() => {
+    void fetchUnreadCount();
+  }, [fetchUnreadCount]);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={{ flex: 1 }}>
-        
+
         {/* 1. Header Global */}
-        <DashboardHeader 
+        <DashboardHeader
             avatarUrl="https://i.pravatar.cc/150?u=a042581f4e29026024d"
-            onMenuPress={() => console.log('Menu')}
+            hasUnread={unreadCount > 0}
+            onMenuPress={() => router.push('/notifications' as never)}
             variant="standard"
         />
 

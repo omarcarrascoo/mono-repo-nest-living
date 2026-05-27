@@ -68,20 +68,20 @@ export default function TabLayout() {
         }}
       />
       
-       {/* TAB 3: Pagos */}
+       {/* TAB 3: Delivery */}
       <Tabs.Screen
-        name="finance"
+        name="delivery"
         options={{
-          title: 'Pagos',
+          title: 'Delivery',
           tabBarIcon: ({ color, focused }) => (
             <View style={styles.iconContainer}>
-              <Feather name="credit-card" size={24} color={color} style={{ opacity: focused ? 1 : 0.8 }} />
+              <Feather name="shopping-bag" size={24} color={color} style={{ opacity: focused ? 1 : 0.8 }} />
               {focused && <View style={[styles.activeDot, { backgroundColor: activeColor }]} />}
             </View>
           ),
         }}
       />
-      
+
        {/* TAB 4: Reservas */}
       <Tabs.Screen
         name="reservations"
@@ -96,19 +96,10 @@ export default function TabLayout() {
         }}
       />
 
-       {/* TAB 5: Promociones */}
-      <Tabs.Screen
-        name="promotions"
-        options={{
-          title: 'Promociones',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={styles.iconContainer}>
-              <Feather name="gift" size={24} color={color} style={{ opacity: focused ? 1 : 0.8 }} />
-              {focused && <View style={[styles.activeDot, { backgroundColor: activeColor }]} />}
-            </View>
-          ),
-        }}
-      />
+      {/* Ocultos temporalmente — el archivo sigue ahí pero no aparece en el tab bar.
+          Volvemos a colgarlos cuando los volvamos a habilitar. */}
+      <Tabs.Screen name="finance" options={{ href: null }} />
+      <Tabs.Screen name="promotions" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -106,6 +106,25 @@ PORT=3000
 | DELETE | `/reservations/:id` | JWT | — | cancel (status='cancelled', libera slot) |
 | POST | `/notifications/register-token` | JWT | — | registra Expo Push Token |
 | DELETE | `/notifications/unregister-token` | JWT | — | quita Expo Push Token |
+| GET | `/notifications/me` | JWT | — | inbox in-app (`?unreadOnly='true'`) |
+| GET | `/notifications/me/unread-count` | JWT | — | `{ count }` para badge |
+| PATCH | `/notifications/:id/read` | JWT | — | marca leída (owner-only) |
+| POST | `/notifications/mark-all-read` | JWT | — | marca todo el inbox como leído |
+| GET | `/delivery/categories` | JWT | — | scoped, con `productCount` |
+| POST | `/delivery/categories` | JWT | admin | scoped (slug único por residencia) |
+| PUT | `/delivery/categories/:id` | JWT | admin | scoped |
+| DELETE | `/delivery/categories/:id` | JWT | admin | 409 si tiene productos |
+| GET | `/delivery/products` | JWT | — | scoped + `q?`, `category?`, `status?`, `featured?` |
+| GET | `/delivery/products/featured` | JWT | — | producto destacado del día |
+| GET | `/delivery/products/:id` | JWT | — | detalle con `optionGroups` |
+| POST | `/delivery/products` | JWT | admin | crea producto |
+| PUT | `/delivery/products/:id` | JWT | admin | update parcial |
+| DELETE | `/delivery/products/:id` | JWT | admin | scoped |
+| POST | `/delivery/orders` | JWT | — | crea orden (recalcula precio server-side, dispara notificaciones) |
+| GET | `/delivery/orders/me` | JWT | — | mis pedidos (`?filter=active\|completed\|all`) |
+| GET | `/delivery/orders` | JWT | admin / kitchen_operator | listado de staff (`?status?`, `?filter?`, `?userId?`) |
+| GET | `/delivery/orders/:id` | JWT | — | owner-only; staff puede ver cualquiera de su residencia |
+| PATCH | `/delivery/orders/:id/status` | JWT | admin / kitchen_operator | avanza estado, valida transición; cancel solo admin |
 
 ## Comandos
 

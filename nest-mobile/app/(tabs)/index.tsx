@@ -20,6 +20,7 @@ import { useAmenitiesStore } from '@/stores/amenities-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCategoriesStore } from '@/stores/categories-store';
 import { useFavoritesStore } from '@/stores/favorites-store';
+import { useNotificationsStore } from '@/stores/notifications-store';
 import { Amenity } from '@/types/api';
 
 function toCard(item: Amenity): AmenityItem {
@@ -52,6 +53,9 @@ export default function UnifiedAmenitiesScreen() {
   const favoritesLoaded = useFavoritesStore((s) => s.loaded);
   const hydrateFavorites = useFavoritesStore((s) => s.hydrate);
 
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
 
@@ -60,7 +64,8 @@ export default function UnifiedAmenitiesScreen() {
     void fetchAll();
     void fetchCategories();
     if (!favoritesLoaded) void hydrateFavorites();
-  }, [fetchAll, fetchCategories, favoritesLoaded, hydrateFavorites]);
+    void fetchUnreadCount();
+  }, [fetchAll, fetchCategories, favoritesLoaded, hydrateFavorites, fetchUnreadCount]);
 
   // Debounce solo la búsqueda de texto. La categoría se envía inmediatamente
   // (un click no debería esperar 300ms para responder).
@@ -104,7 +109,8 @@ export default function UnifiedAmenitiesScreen() {
             }
             userName={user?.fullName?.split(' ')[0] ?? 'Vecino'}
             location={user?.unitNumber ?? user?.residencyId ?? 'Tu residencia'}
-            onMenuPress={() => console.log('Open Menu')}
+            hasUnread={unreadCount > 0}
+            onMenuPress={() => router.push('/notifications' as never)}
           />
 
           <HeroSearch

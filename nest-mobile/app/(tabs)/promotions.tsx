@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  SafeAreaView, 
-  StatusBar, 
-  StyleSheet, 
-  TouchableOpacity, 
-  FlatList, 
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
 
 // Imports de Componentes y Tipos
@@ -20,6 +21,7 @@ import { HeroDealCard } from '@/components/promotions/HeroDealCard';
 import { RegularDealCard } from '@/components/promotions/RegularDealCard';
 import { PromoCategory, PromoDeal } from '@/types/promotions';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
+import { useNotificationsStore } from '@/stores/notifications-store';
 
 // --- MOCK DATA ---
 const CATEGORIES: PromoCategory[] = [
@@ -65,16 +67,25 @@ const DEALS: PromoDeal[] = [
 ];
 
 export default function PromotionsScreen() {
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState('all');
+
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+
+  useEffect(() => {
+    void fetchUnreadCount();
+  }, [fetchUnreadCount]);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.ui.white} />
       <SafeAreaView style={{ flex: 1 }}>
 
-        <DashboardHeader 
+        <DashboardHeader
           avatarUrl="https://i.pravatar.cc/150?u=a042581f4e29026024d"
-          onMenuPress={() => console.log('Open Menu')}
+          hasUnread={unreadCount > 0}
+          onMenuPress={() => router.push('/notifications' as never)}
           variant="standard"
         />
 

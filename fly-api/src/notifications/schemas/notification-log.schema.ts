@@ -5,7 +5,11 @@ export type NotificationKind =
   | 'reservation_created'
   | 'reservation_cancelled'
   | 'reservation_reminder'
-  | 'admin_alert';
+  | 'admin_alert'
+  | 'order_created'
+  | 'order_status_update'
+  | 'order_cancelled'
+  | 'order_admin_alert';
 
 @Schema({ timestamps: true })
 export class NotificationLog extends Document {
@@ -29,6 +33,17 @@ export class NotificationLog extends Document {
 
   @Prop()
   error?: string;
+
+  /** Whether this entry should appear in the in-app inbox (vs push-only). */
+  @Prop({ default: true })
+  inbox: boolean;
+
+  /** Read state — only meaningful for inbox entries. */
+  @Prop({ default: false, index: true })
+  read: boolean;
+
+  @Prop()
+  readAt?: Date;
 }
 
 export const NotificationLogSchema = SchemaFactory.createForClass(NotificationLog);
@@ -39,3 +54,4 @@ NotificationLogSchema.index(
   { expireAfterSeconds: 60 * 60 * 24 * 90 },
 );
 NotificationLogSchema.index({ userId: 1, createdAt: -1 });
+NotificationLogSchema.index({ userId: 1, read: 1, createdAt: -1 });

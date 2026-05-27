@@ -29,7 +29,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       segments[0] === '(tabs)' ||
       segments[0] === 'amenity' ||
       segments[0] === 'profile' ||
-      segments[0] === 'reservation';
+      segments[0] === 'reservation' ||
+      segments[0] === 'delivery' ||
+      segments[0] === 'orders' ||
+      segments[0] === 'notifications';
     const onAuthScreen = segments.length === 0 || segments[0] === 'register' || (segments[0] as string) === 'index';
 
     if (status !== 'authenticated' && inProtectedGroup) {
@@ -71,6 +74,9 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="amenity" options={{ headerShown: false }} />
           <Stack.Screen name="reservation" options={{ headerShown: false }} />
+          <Stack.Screen name="delivery" options={{ headerShown: false }} />
+          <Stack.Screen name="orders" options={{ headerShown: false }} />
+          <Stack.Screen name="notifications" options={{ headerShown: false }} />
           <Stack.Screen name="profile" options={{ headerShown: false }} />
         </Stack>
       </AuthGate>

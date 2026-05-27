@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   IsIn,
   IsOptional,
@@ -25,6 +35,10 @@ class RegisterTokenDto {
   deviceName?: string;
 }
 
+class ListNotificationsQueryDto {
+  @IsOptional() @IsIn(['true', 'false']) unreadOnly?: string;
+}
+
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
@@ -49,5 +63,36 @@ export class NotificationsController {
     @Body() dto: RegisterTokenDto,
   ) {
     return this.notifications.unregisterToken(user.userId, dto.expoPushToken);
+  }
+
+  // ----- Inbox -----
+
+  @Get('me')
+  listMine(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: ListNotificationsQueryDto,
+  ) {
+    return this.notifications.listForUser(user.userId, {
+      unreadOnly: query.unreadOnly === 'true',
+    });
+  }
+
+  @Get('me/unread-count')
+  async unreadCount(@CurrentUser() user: CurrentUserPayload) {
+    const count = await this.notifications.getUnreadCount(user.userId);
+    return { count };
+  }
+
+  @Patch(':id/read')
+  markRead(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.notifications.markRead(user.userId, id);
+  }
+
+  @Post('mark-all-read')
+  markAllRead(@CurrentUser() user: CurrentUserPayload) {
+    return this.notifications.markAllRead(user.userId);
   }
 }
