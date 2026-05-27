@@ -60,6 +60,16 @@
 			"key": "notificationId",
 			"value": "",
 			"type": "string"
+		},
+		{
+			"key": "postId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "replyId",
+			"value": "",
+			"type": "string"
 		}
 	],
 	"item": [
@@ -1552,6 +1562,428 @@
 							]
 						},
 						"description": "Marca todas las notificaciones del inbox como leídas. Devuelve `{ modified: number }`."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Community",
+			"description": "Muro vecinal: posts (residentes) y anuncios (admin), réplicas anidadas (3 niveles), reacciones por emoji.",
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{accessToken}}",
+						"type": "string"
+					}
+				]
+			},
+			"item": [
+				{
+					"name": "GET /community/posts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/community/posts?type=all",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "all",
+									"description": "all | announcement | post"
+								},
+								{
+									"key": "q",
+									"value": "",
+									"disabled": true,
+									"description": "Búsqueda por título/contenido/tag"
+								}
+							]
+						},
+						"description": "Lista posts de la residencia. Pinned primero, luego por `createdAt desc`. Hasta 200 items.\n\n**Query:**\n- `type?` ('all' | 'announcement' | 'post')\n- `q?` — búsqueda case-insensitive en título, contenido y tag."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('status 200', function () {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const json = pm.response.json();",
+									"if (Array.isArray(json) && json.length > 0) {",
+									"  const first = json[0];",
+									"  if (first && (first._id || first.id)) {",
+									"    pm.collectionVariables.set('postId', first._id || first.id);",
+									"  }",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST /community/posts (post de residente)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"post\",\n  \"tag\": \"Consejo\",\n  \"title\": \"¿Recomiendan plomero por la zona?\",\n  \"content\": \"Necesito uno de confianza, abierto a recomendaciones.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/community/posts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts"
+							]
+						},
+						"description": "Crea un post estándar.\n\n**Body:**\n- `type?` ('post' | 'announcement') — default 'post'. 'announcement' requiere rol admin (403).\n- `tag?` (≤60)\n- `title` (1-140, requerido)\n- `content` (1-4000, requerido)\n- `image?` (URL ≤600)\n- `pinned?` (admin only)\n\nResponde el doc creado con `authorId`/`authorName`/`authorRole`."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('status 201', function () {",
+									"  pm.response.to.have.status(201);",
+									"});",
+									"const json = pm.response.json();",
+									"if (json && (json._id || json.id)) {",
+									"  pm.collectionVariables.set('postId', json._id || json.id);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST /community/posts (anuncio admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"announcement\",\n  \"title\": \"Mantenimiento de cisterna el sábado\",\n  \"content\": \"El servicio de agua se interrumpirá de 8:00 a 11:00 hrs. Llenen tinacos.\",\n  \"pinned\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/community/posts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts"
+							]
+						},
+						"description": "Igual que el anterior pero con `type='announcement'`. Solo admin (403 si no).\n\nDispara broadcast a todos los usuarios de la residencia (push + inbox), excluyendo al autor."
+					},
+					"response": []
+				},
+				{
+					"name": "GET /community/posts/:id",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}"
+							]
+						},
+						"description": "Detalle de un post. Scoped por residencia (404 si pertenece a otra)."
+					},
+					"response": []
+				},
+				{
+					"name": "PATCH /community/posts/:id",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Título actualizado\",\n  \"content\": \"Contenido actualizado\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}"
+							]
+						},
+						"description": "Actualiza un post. Solo el autor o un admin (403).\n\n**Body parcial:** `title?`, `content?`, `tag?`, `image?`, `pinned?` (admin only)."
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE /community/posts/:id",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}"
+							]
+						},
+						"description": "Borra un post y todos sus replies. Solo autor o admin."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /community/posts/:id/reactions",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"emoji\": \"❤️\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}/reactions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}",
+								"reactions"
+							]
+						},
+						"description": "Toggle de reacción. Cada usuario solo puede tener UNA reacción por post — si ya reaccionó con otro emoji, se reemplaza; si re-aplica el mismo, se quita.\n\n**Emojis válidos:** `❤️`, `👍`, `😊`, `🎉`, `😢`, `🚀`."
+					},
+					"response": []
+				},
+				{
+					"name": "GET /community/posts/:postId/replies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}/replies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}",
+								"replies"
+							],
+							"query": [
+								{
+									"key": "parentReplyId",
+									"value": "",
+									"disabled": true,
+									"description": "Si se manda, filtra solo respuestas a ese reply."
+								}
+							]
+						},
+						"description": "Lista replies de un post, ordenados por `createdAt asc`.\n\n**Query:** `parentReplyId?` — si se omite trae todos (incluyendo anidados); si se pasa filtra a hijos directos."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('status 200', function () {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const json = pm.response.json();",
+									"if (Array.isArray(json) && json.length > 0) {",
+									"  const first = json[0];",
+									"  if (first && (first._id || first.id)) {",
+									"    pm.collectionVariables.set('replyId', first._id || first.id);",
+									"  }",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST /community/posts/:postId/replies",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"content\": \"Yo recomiendo a Don Pepe, deja tarjeta en seguridad.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}/replies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}",
+								"replies"
+							]
+						},
+						"description": "Crea un reply.\n\n**Body:**\n- `content` (1-2000, requerido)\n- `parentReplyId?` — si se omite es reply directo al post (depth 0). Si viene, debe ser de este mismo post; depth = parent.depth+1, máx 2 (3 niveles totales).\n\nDispara push al autor del post (si no eres tú) y al autor del parentReply (si aplica y no es el mismo del post)."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('status 201', function () {",
+									"  pm.response.to.have.status(201);",
+									"});",
+									"const json = pm.response.json();",
+									"if (json && (json._id || json.id)) {",
+									"  pm.collectionVariables.set('replyId', json._id || json.id);",
+									"}"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "POST /community/posts/:postId/replies (anidado)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"parentReplyId\": \"{{replyId}}\",\n  \"content\": \"Gracias, ¿tienes su número?\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}/replies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}",
+								"replies"
+							]
+						},
+						"description": "Reply al reply anterior. Demuestra el anidamiento."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /community/posts/:postId/replies/:replyId/reactions",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"emoji\": \"👍\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}/replies/{{replyId}}/reactions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}",
+								"replies",
+								"{{replyId}}",
+								"reactions"
+							]
+						},
+						"description": "Toggle de reacción sobre un reply. Misma regla que en posts: 1 reacción por usuario, re-aplica = quitar."
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE /community/posts/:postId/replies/:replyId",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/community/posts/{{postId}}/replies/{{replyId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"community",
+								"posts",
+								"{{postId}}",
+								"replies",
+								"{{replyId}}"
+							]
+						},
+						"description": "Borra reply (cascada — también borra los hijos anidados). Solo autor o admin.\n\nDevuelve `{ ok: true, deleted: number }`."
 					},
 					"response": []
 				}

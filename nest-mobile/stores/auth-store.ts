@@ -8,6 +8,8 @@ import { useReservationsStore } from './reservations-store';
 import { useFavoritesStore } from './favorites-store';
 import { useCategoriesStore } from './categories-store';
 import { useNotificationsStore } from './notifications-store';
+import { useCommunityStore } from './community-store';
+import { usePostThreadStore } from './post-thread-store';
 
 const TOKEN_KEY = 'nest.auth.token';
 
@@ -107,6 +109,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useFavoritesStore.getState().reset();
     useCategoriesStore.getState().reset();
     useNotificationsStore.getState().reset();
+    useCommunityStore.getState().reset();
+    usePostThreadStore.getState().reset();
   },
 
   clearError: () => set({ error: null }),

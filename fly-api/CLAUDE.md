@@ -125,6 +125,16 @@ PORT=3000
 | GET | `/delivery/orders` | JWT | admin / kitchen_operator | listado de staff (`?status?`, `?filter?`, `?userId?`) |
 | GET | `/delivery/orders/:id` | JWT | — | owner-only; staff puede ver cualquiera de su residencia |
 | PATCH | `/delivery/orders/:id/status` | JWT | admin / kitchen_operator | avanza estado, valida transición; cancel solo admin |
+| GET | `/community/posts` | JWT | — | scoped, pinned primero; `?type=all\|announcement\|post`, `?q=` |
+| POST | `/community/posts` | JWT | — | crea post; `type='announcement'` y `pinned` requieren admin |
+| GET | `/community/posts/:id` | JWT | — | scoped por residencia |
+| PATCH | `/community/posts/:id` | JWT | — | autor o admin; pinned solo admin |
+| DELETE | `/community/posts/:id` | JWT | — | autor o admin; cascada a replies |
+| POST | `/community/posts/:id/reactions` | JWT | — | toggle 1-emoji-por-usuario |
+| GET | `/community/posts/:postId/replies` | JWT | — | replies del post; `?parentReplyId=` filtra hijos directos |
+| POST | `/community/posts/:postId/replies` | JWT | — | reply (con `parentReplyId?` para anidar, depth máx 2) |
+| DELETE | `/community/posts/:postId/replies/:replyId` | JWT | — | autor o admin; cascada a hijos |
+| POST | `/community/posts/:postId/replies/:replyId/reactions` | JWT | — | toggle reacción de reply |
 
 ## Comandos
 

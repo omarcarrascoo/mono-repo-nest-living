@@ -131,6 +131,23 @@ export class NotificationsService {
     );
   }
 
+  /**
+   * Broadcast to every user in a residency. Used for admin announcements
+   * posted to the community wall. Skips the sender via `excludeUserId`.
+   */
+  async notifyResidency(
+    residencyId: string,
+    payload: NotifyPayload,
+    opts: { excludeUserId?: string } = {},
+  ) {
+    const users = await this.usersService.findAllByResidency(residencyId);
+    await Promise.all(
+      users
+        .filter((u) => String(u._id) !== opts.excludeUserId)
+        .map((u) => this.notifyUser(String(u._id), payload)),
+    );
+  }
+
   // ============================================================
   // In-app inbox
   // ============================================================

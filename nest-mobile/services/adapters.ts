@@ -7,6 +7,10 @@ import {
   CartItem,
   CartItemModifier,
   Category,
+  CommunityAuthor,
+  CommunityPost,
+  CommunityPostType,
+  CommunityReply,
   FeaturedProduct,
   Notification,
   NotificationKind,
@@ -19,8 +23,10 @@ import {
   ProductOption,
   ProductOptionGroup,
   ProductStatus,
+  ReactionSummary,
   Reservation,
   ReservationStatus,
+  Role,
 } from '@/types/api';
 
 type Raw = Record<string, any>;
@@ -272,6 +278,91 @@ export function adaptOrder(raw: Raw): Order {
       ? raw.statusHistory.map(adaptOrderStatusEvent)
       : [],
     notes: raw.notes,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
+
+// ============================================================
+// Community
+// ============================================================
+
+/**
+ * Backend devuelve `reactions` como objeto `{ emoji: ObjectId[] }`. Lo
+ * convertimos a un summary `{ emoji: count }` y, dado un `currentUserId`,
+ * calculamos `myReaction` (o null si el usuario no reaccionó).
+ *
+ * Mongo a veces serializa Map como `{}` literal, otras veces como
+ * `{ emoji: [id, id] }` plano. Tratamos ambos.
+ */
+function summarizeReactions(
+  raw: Raw | undefined,
+  currentUserId?: string,
+): { summary: ReactionSummary; mine: string | null } {
+  const summary: ReactionSummary = {};
+  let mine: string | null = null;
+  if (!raw || typeof raw !== 'object') return { summary, mine };
+  for (const emoji of Object.keys(raw)) {
+    const ids = raw[emoji];
+    if (!Array.isArray(ids)) continue;
+    summary[emoji] = ids.length;
+    if (
+      currentUserId &&
+      mine === null &&
+      ids.some((id) => String(id) === currentUserId)
+    ) {
+      mine = emoji;
+    }
+  }
+  return { summary, mine };
+}
+
+function adaptCommunityAuthor(raw: Raw): CommunityAuthor {
+  return {
+    id: raw.authorId ? String(raw.authorId) : '',
+    name: raw.authorName ?? 'Vecino',
+    avatar: raw.authorAvatar,
+    role: (raw.authorRole ?? 'user') as Role,
+  };
+}
+
+export function adaptCommunityPost(
+  raw: Raw,
+  currentUserId?: string,
+): CommunityPost {
+  const { summary, mine } = summarizeReactions(raw.reactions, currentUserId);
+  return {
+    id: raw._id ?? raw.id,
+    residencyId: raw.residencyId,
+    type: (raw.type ?? 'post') as CommunityPostType,
+    author: adaptCommunityAuthor(raw),
+    tag: raw.tag,
+    title: raw.title ?? '',
+    content: raw.content ?? '',
+    image: raw.image,
+    pinned: !!raw.pinned,
+    reactions: summary,
+    myReaction: mine,
+    repliesCount: typeof raw.repliesCount === 'number' ? raw.repliesCount : 0,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+  };
+}
+
+export function adaptCommunityReply(
+  raw: Raw,
+  currentUserId?: string,
+): CommunityReply {
+  const { summary, mine } = summarizeReactions(raw.reactions, currentUserId);
+  return {
+    id: raw._id ?? raw.id,
+    postId: raw.postId ? String(raw.postId) : '',
+    parentReplyId: raw.parentReplyId ? String(raw.parentReplyId) : null,
+    depth: typeof raw.depth === 'number' ? raw.depth : 0,
+    author: adaptCommunityAuthor(raw),
+    content: raw.content ?? '',
+    reactions: summary,
+    myReaction: mine,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
   };

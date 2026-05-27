@@ -10,6 +10,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DeliveryModule } from './delivery/delivery.module';
+import { CommunityModule } from './community/community.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { DeliveryModule } from './delivery/delivery.module';
     ReservationsModule,
     NotificationsModule,
     DeliveryModule,
+    CommunityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

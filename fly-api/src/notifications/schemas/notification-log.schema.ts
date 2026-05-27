@@ -9,7 +9,10 @@ export type NotificationKind =
   | 'order_created'
   | 'order_status_update'
   | 'order_cancelled'
-  | 'order_admin_alert';
+  | 'order_admin_alert'
+  | 'community_announcement'
+  | 'community_post_reply'
+  | 'community_reply_reply';
 
 @Schema({ timestamps: true })
 export class NotificationLog extends Document {

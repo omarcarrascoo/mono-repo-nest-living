@@ -38,6 +38,14 @@ export class UsersService {
       .exec() as unknown as User[];
   }
 
+  async findAllByResidency(residencyId: string): Promise<User[]> {
+    return this.userModel
+      .find({ residencyId })
+      .select('_id email fullName role avatar')
+      .lean()
+      .exec() as unknown as User[];
+  }
+
   async getFavoriteIds(userId: string): Promise<string[]> {
     const user = await this.userModel
       .findById(userId)

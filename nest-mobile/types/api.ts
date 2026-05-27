@@ -349,7 +349,10 @@ export type NotificationKind =
   | 'order_created'
   | 'order_status_update'
   | 'order_cancelled'
-  | 'order_admin_alert';
+  | 'order_admin_alert'
+  | 'community_announcement'
+  | 'community_post_reply'
+  | 'community_reply_reply';
 
 export interface Notification {
   id: string;
@@ -360,4 +363,81 @@ export interface Notification {
   read: boolean;
   readAt?: string;
   createdAt: string;
+}
+
+// ============================================================
+// Community
+// ============================================================
+
+export type CommunityPostType = 'announcement' | 'post';
+
+export const REACTION_EMOJIS = ['❤️', '👍', '😊', '🎉', '😢', '🚀'] as const;
+export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
+
+/** Mapa emoji → cantidad de gente que reaccionó. Lo derivamos del backend. */
+export type ReactionSummary = Record<string, number>;
+
+export interface CommunityAuthor {
+  id: string;
+  name: string;
+  avatar?: string;
+  role: Role;
+}
+
+export interface CommunityPost {
+  id: string;
+  residencyId: string;
+  type: CommunityPostType;
+  author: CommunityAuthor;
+  tag?: string;
+  title: string;
+  content: string;
+  image?: string;
+  pinned: boolean;
+  reactions: ReactionSummary;
+  /** Emoji con el que el usuario actual reaccionó (o null si no). */
+  myReaction: string | null;
+  repliesCount: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CommunityReply {
+  id: string;
+  postId: string;
+  parentReplyId: string | null;
+  depth: number;
+  author: CommunityAuthor;
+  content: string;
+  reactions: ReactionSummary;
+  myReaction: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreatePostRequest {
+  type?: CommunityPostType;
+  tag?: string;
+  title: string;
+  content: string;
+  image?: string;
+  pinned?: boolean;
+}
+
+export interface UpdatePostRequest {
+  tag?: string;
+  title?: string;
+  content?: string;
+  image?: string;
+  pinned?: boolean;
+}
+
+export interface ListPostsParams {
+  type?: 'all' | CommunityPostType;
+  q?: string;
+}
+
+export interface CreateReplyRequest {
+  parentReplyId?: string;
+  content: string;
 }
