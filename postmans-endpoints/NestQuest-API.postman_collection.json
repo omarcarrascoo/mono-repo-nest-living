@@ -1,0 +1,795 @@
+{
+  "info": {
+    "name": "NestQuest API",
+    "_postman_id": "f5b2c4d8-6a3e-4f9c-b7d1-1c8a5e9f2a4b",
+    "description": "Mapa completo de endpoints del backend `fly-api` (NestJS).\n\n## Cómo usar\n1. Importa esta colección y el environment `NestQuest-Local.postman_environment.json`.\n2. Selecciona el environment `NestQuest Local` arriba a la derecha.\n3. Ejecuta `Auth → POST /auth/register` (solo la primera vez) para crear un usuario admin.\n4. Ejecuta `Auth → POST /auth/login` — el `access_token` se guarda automáticamente en `{{accessToken}}`.\n5. El resto de endpoints usan ese token vía Bearer Auth a nivel de carpeta.\n\n## Variables\n- `baseUrl` — URL del backend (default `http://localhost:3000`).\n- `accessToken` — JWT, se llena automáticamente al hacer login.\n- `amenityId` — ID de amenidad, se llena automáticamente al crear o listar.\n- `categoryId` — ID de categoría, se llena automáticamente al crear o listar.\n- `reservationId` — ID de reserva, se llena automáticamente al crear o listar.\n- `userId` — ID del usuario logueado, se llena al consultar `/users/me`.\n- `residencyId` — Residencia del usuario logueado, se llena al consultar `/users/me`.\n\n## Regla de oro\nCada vez que se agrega/modifica un endpoint en `fly-api/`, esta colección **debe** actualizarse en el mismo cambio. Ver `fly-api/CLAUDE.md`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "amenityId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reservationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "residencyId",
+      "value": "res-001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Root",
+      "description": "Health-check / hello endpoint (no auth).",
+      "item": [
+        {
+          "name": "GET / (hello)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Devuelve un string de saludo. Útil para confirmar que el backend está vivo."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Endpoints públicos de autenticación. No requieren token.",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201 o 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json && (json._id || json.id)) {",
+                  "  pm.collectionVariables.set('userId', json._id || json.id);",
+                  "}",
+                  "if (json && json.residencyId) {",
+                  "  pm.collectionVariables.set('residencyId', json.residencyId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Admin User\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"admin\",\n  \"residencyId\": \"res-001\",\n  \"unitNumber\": \"A-101\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Crea un usuario nuevo. Campos:\n- `fullName` (string, requerido)\n- `email` (string, requerido, único)\n- `password` (string, mínimo 6)\n- `role` ('user' | 'admin', default 'user')\n- `residencyId` (string, requerido — multitenancy)\n- `unitNumber` (string, opcional)\n\nDevuelve el documento del usuario creado (sin password)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('returns access_token', function () {",
+                  "  pm.expect(json).to.have.property('access_token');",
+                  "});",
+                  "",
+                  "if (json && json.access_token) {",
+                  "  pm.collectionVariables.set('accessToken', json.access_token);",
+                  "  console.log('accessToken guardado en variables de la colección.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Devuelve `{ access_token: string }`.\n\nEl test script captura el token automáticamente y lo guarda en `{{accessToken}}` para que el resto de la colección lo use vía Bearer Auth.\n\n**401** si las credenciales son inválidas."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "Endpoints de usuario. Requieren JWT Bearer.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "GET /users/me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json && (json._id || json.id)) {",
+                  "  pm.collectionVariables.set('userId', json._id || json.id);",
+                  "}",
+                  "if (json && json.residencyId) {",
+                  "  pm.collectionVariables.set('residencyId', json.residencyId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me"]
+            },
+            "description": "Devuelve el usuario asociado al token actual (sin password).\n\nIncluye `favorites: string[]` (ids de amenidades) y `notificationPreferences: { reservationReminders, reservationUpdates, adminAlerts }`.\n\nEl frontend llama esto al iniciar la app para hidratar la sesión."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /users/me/favorites",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/favorites",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "favorites"]
+            },
+            "description": "Devuelve los IDs de amenidades favoritas del usuario.\n\n**Response:** `{ ids: string[] }`\n\nEl frontend usa esto al hidratar el `favorites-store` en lugar de filtrar `/amenities?favorite=true` (más liviano)."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /users/me/notification-preferences",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reservationReminders\": true,\n  \"reservationUpdates\": true,\n  \"adminAlerts\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/me/notification-preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "notification-preferences"]
+            },
+            "description": "Actualiza las preferencias de notificaciones del usuario. Todos los campos son opcionales.\n\n- `reservationReminders` (bool) — recordatorio 15 min antes de la reserva.\n- `reservationUpdates` (bool) — confirmación al crear/modificar/cancelar reserva.\n- `adminAlerts` (bool, solo aplica a admins) — alertas globales del fraccionamiento.\n\nDevuelve el usuario completo actualizado."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "description": "Categorías editables del fraccionamiento. Las lecturas requieren JWT; las escrituras requieren `role = 'admin'`. Scoped por `residencyId` del token.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "GET /categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (Array.isArray(json) && json.length > 0) {",
+                  "  const first = json[0];",
+                  "  if (first && (first._id || first.id)) {",
+                  "    pm.collectionVariables.set('categoryId', first._id || first.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            },
+            "description": "Lista todas las categorías activas de la residencia, ordenadas por `sortOrder`.\n\nEl test script guarda el `_id` de la primera en `{{categoryId}}` para reuso."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /categories (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201 o 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json && (json._id || json.id)) {",
+                  "  pm.collectionVariables.set('categoryId', json._id || json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Deportivas\",\n  \"slug\": \"deportivas\",\n  \"icon\": \"activity\",\n  \"color\": \"#0ea5e9\",\n  \"sortOrder\": 1,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            },
+            "description": "Crea una categoría. Campos:\n- `name` (string, 1-60, requerido)\n- `slug` (string, 1-60, lowercase + numeros + guiones, requerido)\n- `icon` (string, opcional — nombre Feather icon)\n- `color` (hex, opcional)\n- `sortOrder` (int >= 0, opcional)\n- `active` (bool, opcional — default true)\n\nEl `residencyId` se infiere del token.\n\n**403** si no admin. **409** si el `slug` ya existe en la residencia."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /categories/:id (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sociales\",\n  \"icon\": \"users\",\n  \"color\": \"#a855f7\",\n  \"sortOrder\": 2,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "{{categoryId}}"]
+            },
+            "description": "Actualiza parcialmente una categoría. Todos los campos son opcionales. El `slug` no se puede cambiar (immutable).\n\n**403** si no admin. **404** si no existe en la residencia."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /categories/:id (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "{{categoryId}}"]
+            },
+            "description": "Elimina (o desactiva — ver service) una categoría.\n\n**403** si no admin. **404** si no existe en la residencia."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Amenities",
+      "description": "CRUD de amenidades + búsqueda + favoritos + disponibilidad. Scoped por `residencyId` del token.\n\nLas lecturas requieren JWT; las escrituras (POST/PUT/DELETE) requieren `role = 'admin'`. Los favoritos (POST/DELETE `:id/favorite`) son para cualquier user autenticado.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "GET /amenities",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "pm.test('returns array', function () {",
+                  "  pm.expect(json).to.be.an('array');",
+                  "});",
+                  "",
+                  "if (Array.isArray(json) && json.length > 0) {",
+                  "  const first = json[0];",
+                  "  if (first && (first._id || first.id)) {",
+                  "    pm.collectionVariables.set('amenityId', first._id || first.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/amenities?q=&category=&favorite=",
+              "host": ["{{baseUrl}}"],
+              "path": ["amenities"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Búsqueda full-text (insensible a mayúsculas) en title/description/location."
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "Filtra por categoryId (Mongo ObjectId)."
+                },
+                {
+                  "key": "favorite",
+                  "value": "",
+                  "description": "'true' para devolver solo las amenidades favoritas del usuario."
+                }
+              ]
+            },
+            "description": "Lista amenidades de la residencia del usuario logueado.\n\n**Query params (todos opcionales):**\n- `q` — búsqueda parcial en title/description/location\n- `category` — filtra por `categoryId`\n- `favorite` — `'true'` para favoritos del usuario\n\nEl test script guarda el `_id` de la primera en `{{amenityId}}` para reuso."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /amenities/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/amenities/{{amenityId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["amenities", "{{amenityId}}"]
+            },
+            "description": "Devuelve una amenidad por ID, validando que pertenezca a la residencia del usuario.\n\n**404** si no existe o no es de su residencia."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /amenities/:id/availability",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/amenities/{{amenityId}}/availability?date=2026-06-07",
+              "host": ["{{baseUrl}}"],
+              "path": ["amenities", "{{amenityId}}", "availability"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-06-07",
+                  "description": "Fecha en formato YYYY-MM-DD (en la TZ de la amenidad)."
+                }
+              ]
+            },
+            "description": "Devuelve la disponibilidad de slots para una amenidad en una fecha dada.\n\n**Response shape:**\n```json\n{\n  \"amenityId\": \"...\",\n  \"date\": \"2026-06-07\",\n  \"timezone\": \"America/Mexico_City\",\n  \"slots\": [\n    {\n      \"startTime\": \"2026-06-07T16:00:00.000Z\",\n      \"endTime\": \"2026-06-07T17:00:00.000Z\",\n      \"available\": true,\n      \"takenCount\": 0,\n      \"capacity\": 4,\n      \"reason\": null\n    }\n  ]\n}\n```\n\n`reason` puede ser: `past`, `lead_time`, `horizon`, `full`.\n\n**400** si `date` no es YYYY-MM-DD. **404** si la amenidad no es de la residencia del usuario."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /amenities/:id/favorite",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/amenities/{{amenityId}}/favorite",
+              "host": ["{{baseUrl}}"],
+              "path": ["amenities", "{{amenityId}}", "favorite"]
+            },
+            "description": "Marca la amenidad como favorita para el usuario actual. Idempotente — si ya estaba favorita no falla.\n\n**Response:** `{ ok: true, favorite: true }`\n\n**404** si la amenidad no es de la residencia del usuario."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /amenities/:id/favorite",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/amenities/{{amenityId}}/favorite",
+              "host": ["{{baseUrl}}"],
+              "path": ["amenities", "{{amenityId}}", "favorite"]
+            },
+            "description": "Quita el favorito. Idempotente.\n\n**Response:** `{ ok: true, favorite: false }`"
+          },
+          "response": []
+        },
+        {
+          "name": "POST /amenities (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201 o 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json && (json._id || json.id)) {",
+                  "  pm.collectionVariables.set('amenityId', json._id || json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Pool\",\n  \"description\": \"Outdoor pool with lifeguard\",\n  \"image\": \"https://example.com/pool.jpg\",\n  \"location\": \"Building A\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"status\": \"available\",\n  \"timezone\": \"America/Mexico_City\",\n  \"slotDurationMinutes\": 60,\n  \"maxConcurrentReservations\": 4,\n  \"maxPerUserPerDay\": 1,\n  \"bookingLeadMinutes\": 30,\n  \"bookingHorizonDays\": 14,\n  \"capacity\": 20,\n  \"schedule\": {\n    \"mon\": { \"open\": \"08:00\", \"close\": \"20:00\", \"closed\": false },\n    \"tue\": { \"open\": \"08:00\", \"close\": \"20:00\", \"closed\": false },\n    \"wed\": { \"open\": \"08:00\", \"close\": \"20:00\", \"closed\": false },\n    \"thu\": { \"open\": \"08:00\", \"close\": \"20:00\", \"closed\": false },\n    \"fri\": { \"open\": \"08:00\", \"close\": \"22:00\", \"closed\": false },\n    \"sat\": { \"open\": \"09:00\", \"close\": \"22:00\", \"closed\": false },\n    \"sun\": { \"open\": \"09:00\", \"close\": \"18:00\", \"closed\": false }\n  },\n  \"features\": [\n    { \"icon\": \"pool\", \"label\": \"Heated\" },\n    { \"icon\": \"towel\", \"label\": \"Towels Provided\" }\n  ],\n  \"rules\": [\n    \"No glass containers\",\n    \"Shower before entry\"\n  ],\n  \"rating\": 4.6,\n  \"reviews\": 12\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/amenities",
+              "host": ["{{baseUrl}}"],
+              "path": ["amenities"]
+            },
+            "description": "Crea una amenidad. El backend fuerza el `residencyId` del token, ignorando el body.\n\n**Campos clave de booking:**\n- `slotDurationMinutes` (int, 15-480)\n- `maxConcurrentReservations` (int, 1-500) — capacidad simultánea por slot\n- `maxPerUserPerDay` (int, 0-50) — 0 = sin límite\n- `bookingLeadMinutes` (int, >= 0) — tiempo mínimo de antelación\n- `bookingHorizonDays` (int, 1-365) — cuánto a futuro se puede reservar\n- `timezone` (string IANA, ej. 'America/Mexico_City')\n- `schedule` (WeeklySchedule con open/close HH:mm + closed por día)\n\n**403** si el usuario no es admin."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /amenities/:id (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"maintenance\",\n  \"description\": \"Closed for cleaning\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/amenities/{{amenityId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["amenities", "{{amenityId}}"]
+            },
+            "description": "Actualiza parcialmente una amenidad. Todos los campos del POST son opcionales aquí.\n\n**403** si no admin. **404** si la amenidad no es de su residencia."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /amenities/:id (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/amenities/{{amenityId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["amenities", "{{amenityId}}"]
+            },
+            "description": "Elimina una amenidad de la residencia del usuario.\n\n**403** si no admin. **404** si no es de su residencia."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "description": "Reservas del usuario. Todos los endpoints requieren JWT.\n\n- Ownership check: el usuario solo ve/modifica sus propias reservas. Admins pueden actuar sobre cualquier reserva de su residencia.\n- Anti-IDOR: el `userId` del JWT siempre se compara contra `reservation.userId`.\n- Race-safe: el backend usa un índice parcial único + transacciones para reservar capacidad sin race conditions.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "POST /reservations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201 o 200', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json && (json._id || json.id)) {",
+                  "  pm.collectionVariables.set('reservationId', json._id || json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amenityId\": \"{{amenityId}}\",\n  \"startTime\": \"2026-06-07T16:00:00.000Z\",\n  \"notes\": \"Cumpleaños de mi hijo\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reservations",
+              "host": ["{{baseUrl}}"],
+              "path": ["reservations"]
+            },
+            "description": "Crea una reserva.\n\n**Body:**\n- `amenityId` (Mongo ObjectId, requerido)\n- `startTime` (ISO-8601, requerido) — debe coincidir con un slot válido (alineado a `slotDurationMinutes` desde `schedule.open`).\n- `notes` (string, 0-280, opcional)\n\nEl `endTime` se calcula servidor-side: `startTime + amenity.slotDurationMinutes`.\n\nDispara push notification al usuario (`reservationUpdates`).\n\n**Errores:**\n- 400 — slot inválido (lead_time, past, horizon)\n- 404 — amenity no existe en la residencia\n- 409 — slot lleno (capacidad agotada) o el usuario excedió `maxPerUserPerDay`"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /reservations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reservations?filter=upcoming&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["reservations"],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "upcoming",
+                  "description": "'upcoming' (default) | 'past' | 'cancelled' | 'all'"
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "ISO-8601 startTime del último item de la página anterior (cursor pagination)",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "1-50 (default 20)"
+                }
+              ]
+            },
+            "description": "Lista reservas del usuario logueado, paginadas por cursor (no offset — para que no se hagan lentas con el tiempo).\n\n**Response shape:**\n```json\n{\n  \"items\": [Reservation, ...],\n  \"nextCursor\": \"2026-06-07T16:00:00.000Z\" | null\n}\n```\n\nLos items incluyen `amenityId` poblado con `{ title, image, location }` para evitar N+1 en el frontend.\n\nFiltros:\n- `upcoming` — `status='confirmed'` y `startTime > now`, ordenado asc\n- `past` — `startTime <= now` o `status='completed'`, ordenado desc\n- `cancelled` — `status='cancelled'`, ordenado desc\n- `all` — todas las del usuario, ordenado desc"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /reservations/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reservations/{{reservationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["reservations", "{{reservationId}}"]
+            },
+            "description": "Devuelve una reserva por ID.\n\n**Anti-IDOR:** falla con **404** si el `userId` de la reserva no coincide con el del token, salvo que el caller sea admin (en cuyo caso debe ser de la misma residencia)."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /reservations/:id",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startTime\": \"2026-06-07T18:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reservations/{{reservationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["reservations", "{{reservationId}}"]
+            },
+            "description": "Modifica el `startTime` y/o `notes` de una reserva existente. Si solo manda `notes` no hay race; si manda `startTime` el backend hace una transacción que libera el slot viejo y reserva el nuevo.\n\n**Body (todos opcionales):**\n- `startTime` (ISO-8601)\n- `notes` (string, 0-280)\n\n**Anti-IDOR:** mismo rule que GET — owner o admin de la misma residencia.\n\n**Errores:** 400 (slot inválido), 404 (no encontrada o no es del usuario), 409 (slot lleno).\n\nDispara push notification de actualización."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /reservations/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reservations/{{reservationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["reservations", "{{reservationId}}"]
+            },
+            "description": "Cancela la reserva (no la borra — `status` pasa a `'cancelled'`). Libera el slot para otros usuarios.\n\nIdempotente: si ya estaba cancelada devuelve la misma reserva sin error.\n\nDispara push notification de cancelación al usuario y al admin del fraccionamiento (si tiene `adminAlerts` activado).\n\n**404** si no es del usuario y no es admin."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "Registro de Expo Push Tokens del dispositivo del usuario. Idempotente — si el token ya está registrado para el user, solo actualiza `platform` / `deviceName` / `lastSeenAt`.",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "POST /notifications/register-token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expoPushToken\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]\",\n  \"platform\": \"ios\",\n  \"deviceName\": \"iPhone 15 de Omar\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/register-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "register-token"]
+            },
+            "description": "Registra (o actualiza) un Expo Push Token para el usuario actual.\n\n**Body:**\n- `expoPushToken` (string, 20-200, requerido) — viene de `Notifications.getExpoPushTokenAsync()` en el cliente.\n- `platform` ('ios' | 'android' | 'web' | 'unknown', opcional)\n- `deviceName` (string, 0-80, opcional)\n\nEl frontend llama esto desde `usePushRegistration` apenas el usuario se autentica."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /notifications/unregister-token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expoPushToken\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notifications/unregister-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["notifications", "unregister-token"]
+            },
+            "description": "Quita el token del registro. Útil al hacer logout o al deshabilitar notifs.\n\nIdempotente."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

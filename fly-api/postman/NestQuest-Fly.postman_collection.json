@@ -1,0 +1,168 @@
+{
+  "info": {
+    "name": "Nest Quest Fly API",
+    "_postman_id": "8e6a2f11-59f6-4f8f-9f6b-1a2d8f8f9a2b",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "amenityId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Root",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Admin User\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"admin\",\n  \"residencyId\": \"res-001\",\n  \"unitNumber\": \"A-101\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "POST /auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && json.access_token) {",
+                  "  pm.collectionVariables.set(\"accessToken\", json.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Amenities",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{accessToken}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "POST /amenities (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json && (json._id || json.id)) {",
+                  "  pm.collectionVariables.set(\"amenityId\", json._id || json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Pool\",\n  \"description\": \"Outdoor pool with lifeguard\",\n  \"image\": \"https://example.com/pool.jpg\",\n  \"location\": \"Building A\",\n  \"rating\": 4.6,\n  \"reviews\": 12,\n  \"status\": \"available\",\n  \"nextSlot\": \"2026-02-07T10:00:00Z\",\n  \"availableSlots\": [\"2026-02-07T10:00:00Z\", \"2026-02-07T11:00:00Z\"],\n  \"capacity\": 20,\n  \"features\": [\n    {\"icon\": \"pool\", \"label\": \"Heated\"},\n    {\"icon\": \"towel\", \"label\": \"Towels Provided\"}\n  ],\n  \"rules\": [\"No glass containers\", \"Shower before entry\"]\n}"
+            },
+            "url": "{{baseUrl}}/amenities"
+          }
+        },
+        {
+          "name": "GET /amenities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/amenities"
+          }
+        },
+        {
+          "name": "PUT /amenities/:id (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"maintenance\",\n  \"description\": \"Closed for cleaning\"\n}"
+            },
+            "url": "{{baseUrl}}/amenities/{{amenityId}}"
+          }
+        },
+        {
+          "name": "DELETE /amenities/:id (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/amenities/{{amenityId}}"
+          }
+        }
+      ]
+    }
+  ]
+}
