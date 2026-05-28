@@ -53,6 +53,30 @@ export class ListReservationsQueryDto {
   limit?: number;
 }
 
+export class AdminListReservationsQueryDto {
+  @IsOptional()
+  @IsEnum(['upcoming', 'past', 'cancelled', 'all'])
+  filter?: 'upcoming' | 'past' | 'cancelled' | 'all';
+
+  @IsOptional()
+  @IsMongoId()
+  userId?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  amenityId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
+}
+
 export class AvailabilityQueryDto {
   @IsString()
   @Matches(ISO_DATE, { message: 'date must be YYYY-MM-DD' })

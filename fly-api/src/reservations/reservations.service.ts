@@ -32,6 +32,15 @@ export interface ListReservationsOptions {
   limit: number;
 }
 
+export interface AdminListReservationsOptions {
+  residencyId: string;
+  filter: 'upcoming' | 'past' | 'cancelled' | 'all';
+  userId?: string;
+  amenityId?: string;
+  cursor?: string;
+  limit: number;
+}
+
 @Injectable()
 export class ReservationsService {
   private readonly logger = new Logger(ReservationsService.name);
@@ -335,6 +344,54 @@ export class ReservationsService {
     return { items, nextCursor };
   }
 
+  async listForResidency(opts: AdminListReservationsOptions) {
+    const { residencyId, filter, limit, cursor, userId, amenityId } = opts;
+    const baseFilter: Record<string, any> = { residencyId };
+    if (userId) baseFilter.userId = new Types.ObjectId(userId);
+    if (amenityId) baseFilter.amenityId = new Types.ObjectId(amenityId);
+
+    const now = new Date();
+    switch (filter) {
+      case 'upcoming':
+        baseFilter.status = 'confirmed';
+        baseFilter.startTime = { $gte: now };
+        break;
+      case 'past':
+        baseFilter.status = { $in: ['confirmed', 'completed'] };
+        baseFilter.startTime = { $lt: now };
+        break;
+      case 'cancelled':
+        baseFilter.status = 'cancelled';
+        break;
+      case 'all':
+      default:
+        break;
+    }
+
+    if (cursor) {
+      const cursorDate = new Date(cursor);
+      baseFilter.startTime = {
+        ...(baseFilter.startTime ?? {}),
+        $lt: cursorDate,
+      };
+    }
+
+    const sortDir = filter === 'upcoming' ? 1 : -1;
+    const items = await this.reservationModel
+      .find(baseFilter)
+      .populate(ReservationsService.AMENITY_POPULATE)
+      .populate({ path: 'userId', select: '_id fullName email avatar unitNumber' })
+      .sort({ startTime: sortDir })
+      .limit(limit)
+      .lean()
+      .exec();
+
+    const nextCursor =
+      items.length === limit ? items[items.length - 1].startTime : null;
+
+    return { items, nextCursor };
+  }
+
   async findOne(id: string, userId: string, isAdmin: boolean) {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Reservation not found');
@@ -408,5 +465,106 @@ export class ReservationsService {
     } finally {
       await session.endSession();
     }
+  }
+
+  /**
+   * Stats del dashboard admin. Todo scoped por residencyId. Las ventanas
+   * "today/week/month" son ventanas relativas: últimas 24h / últimos 7 días /
+   * últimos 30 días — no calendario natural, para que sea barato y predecible.
+   */
+  async getAdminStats(residencyId: string) {
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 3600 * 1000);
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+
+    const baseMatch = { residencyId };
+
+    const [counts, topAmenitiesAgg, hourAgg, totalForRate] = await Promise.all([
+      this.reservationModel.aggregate([
+        { $match: baseMatch },
+        {
+          $group: {
+            _id: null,
+            today: {
+              $sum: { $cond: [{ $gte: ['$createdAt', dayAgo] }, 1, 0] },
+            },
+            week: {
+              $sum: { $cond: [{ $gte: ['$createdAt', weekAgo] }, 1, 0] },
+            },
+            month: {
+              $sum: { $cond: [{ $gte: ['$createdAt', monthAgo] }, 1, 0] },
+            },
+            cancelled: {
+              $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] },
+            },
+            total: { $sum: 1 },
+          },
+        },
+      ]),
+      this.reservationModel.aggregate([
+        { $match: { ...baseMatch, createdAt: { $gte: monthAgo } } },
+        { $group: { _id: '$amenityId', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+        {
+          $lookup: {
+            from: 'amenities',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'amenity',
+          },
+        },
+        { $unwind: { path: '$amenity', preserveNullAndEmptyArrays: true } },
+        {
+          $project: {
+            _id: 0,
+            amenityId: { $toString: '$_id' },
+            title: '$amenity.title',
+            count: 1,
+          },
+        },
+      ]),
+      this.reservationModel.aggregate([
+        {
+          $match: {
+            ...baseMatch,
+            startTime: { $gte: monthAgo },
+            status: { $in: ['confirmed', 'completed'] },
+          },
+        },
+        {
+          $group: {
+            _id: { $hour: '$startTime' },
+            count: { $sum: 1 },
+          },
+        },
+        { $project: { _id: 0, hour: '$_id', count: 1 } },
+      ]),
+      this.reservationModel.countDocuments(baseMatch),
+    ]);
+
+    const c = counts[0] ?? { today: 0, week: 0, month: 0, cancelled: 0, total: 0 };
+    const cancellationRate = totalForRate > 0 ? c.cancelled / totalForRate : 0;
+
+    const hourOccupancy: number[] = Array.from({ length: 24 }, () => 0);
+    for (const row of hourAgg as { hour: number; count: number }[]) {
+      if (row.hour >= 0 && row.hour < 24) hourOccupancy[row.hour] = row.count;
+    }
+
+    return {
+      totals: {
+        today: c.today ?? 0,
+        week: c.week ?? 0,
+        month: c.month ?? 0,
+      },
+      topAmenities: topAmenitiesAgg as Array<{
+        amenityId: string;
+        title?: string;
+        count: number;
+      }>,
+      cancellationRate,
+      hourOccupancy,
+    };
   }
 }

@@ -12,6 +12,7 @@ interface PostCardProps {
   onPress: () => void;
   onReact: (emoji: string) => void;
   onReply: () => void;
+  onDelete?: () => void;
 }
 
 export const PostCard: React.FC<PostCardProps> = ({
@@ -19,6 +20,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   onPress,
   onReact,
   onReply,
+  onDelete,
 }) => {
   const created = post.createdAt ? new Date(post.createdAt) : null;
   const subtitle = created
@@ -62,10 +64,23 @@ export const PostCard: React.FC<PostCardProps> = ({
         onToggle={onReact}
       />
 
-      <TouchableOpacity style={styles.replyBtn} onPress={onReply} activeOpacity={0.85}>
-        <Feather name="corner-down-right" size={14} color={COLORS.brand.tealDark} />
-        <Text style={styles.replyText}>Responder</Text>
-      </TouchableOpacity>
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.replyBtn} onPress={onReply} activeOpacity={0.85}>
+          <Feather name="corner-down-right" size={14} color={COLORS.brand.tealDark} />
+          <Text style={styles.replyText}>Responder</Text>
+        </TouchableOpacity>
+        {onDelete ? (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={onDelete}
+            activeOpacity={0.85}
+            hitSlop={6}
+          >
+            <Feather name="trash-2" size={14} color="#dc2626" />
+            <Text style={styles.deleteText}>Eliminar</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -118,8 +133,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.light.border,
     marginVertical: 12,
   },
-  replyBtn: {
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
     marginTop: 10,
+  },
+  replyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -133,5 +154,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: COLORS.brand.tealDark,
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deleteText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#dc2626',
   },
 });

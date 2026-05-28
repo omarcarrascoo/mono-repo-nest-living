@@ -46,6 +46,43 @@ export class UsersService {
       .exec() as unknown as User[];
   }
 
+  async findByResidencyAndUnitPrefix(
+    residencyId: string,
+    unitPrefix: string,
+  ): Promise<User[]> {
+    const safe = unitPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.userModel
+      .find({
+        residencyId,
+        unitNumber: { $regex: `^${safe}`, $options: 'i' },
+      })
+      .select('_id email fullName role avatar unitNumber')
+      .lean()
+      .exec() as unknown as User[];
+  }
+
+  async listForResidencyDirectory(
+    residencyId: string,
+    q?: string,
+  ): Promise<User[]> {
+    const filter: Record<string, any> = { residencyId };
+    if (q && q.trim()) {
+      const safe = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [
+        { fullName: { $regex: safe, $options: 'i' } },
+        { email: { $regex: safe, $options: 'i' } },
+        { unitNumber: { $regex: safe, $options: 'i' } },
+      ];
+    }
+    return this.userModel
+      .find(filter)
+      .select('_id email fullName role avatar unitNumber')
+      .sort({ fullName: 1 })
+      .limit(100)
+      .lean()
+      .exec() as unknown as User[];
+  }
+
   async getFavoriteIds(userId: string): Promise<string[]> {
     const user = await this.userModel
       .findById(userId)

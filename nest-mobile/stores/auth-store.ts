@@ -10,6 +10,7 @@ import { useCategoriesStore } from './categories-store';
 import { useNotificationsStore } from './notifications-store';
 import { useCommunityStore } from './community-store';
 import { usePostThreadStore } from './post-thread-store';
+import { useAdminStore } from './admin-store';
 
 const TOKEN_KEY = 'nest.auth.token';
 
@@ -111,6 +112,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useNotificationsStore.getState().reset();
     useCommunityStore.getState().reset();
     usePostThreadStore.getState().reset();
+    useAdminStore.getState().reset();
   },
 
   clearError: () => set({ error: null }),

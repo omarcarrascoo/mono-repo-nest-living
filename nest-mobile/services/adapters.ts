@@ -1,4 +1,5 @@
 import {
+  AdminReservation,
   Amenity,
   AmenityStatus,
   AuthUser,
@@ -11,6 +12,7 @@ import {
   CommunityPost,
   CommunityPostType,
   CommunityReply,
+  DirectoryUser,
   FeaturedProduct,
   Notification,
   NotificationKind,
@@ -383,4 +385,35 @@ export function adaptNotification(raw: Raw): Notification {
     readAt: raw.readAt,
     createdAt: raw.createdAt,
   };
+}
+
+// ============================================================
+// Admin
+// ============================================================
+
+export function adaptDirectoryUser(raw: Raw): DirectoryUser {
+  return {
+    id: String(raw._id ?? raw.id ?? ''),
+    email: raw.email ?? '',
+    fullName: raw.fullName ?? '',
+    role: (raw.role ?? 'user') as Role,
+    avatar: raw.avatar,
+    unitNumber: raw.unitNumber,
+  };
+}
+
+export function adaptAdminReservation(raw: Raw): AdminReservation {
+  const base = adaptReservation(raw);
+  let user: AdminReservation['user'];
+  if (raw.userId && typeof raw.userId === 'object') {
+    user = {
+      id: String(raw.userId._id ?? raw.userId.id ?? ''),
+      fullName: raw.userId.fullName ?? '',
+      email: raw.userId.email ?? '',
+      avatar: raw.userId.avatar,
+      unitNumber: raw.userId.unitNumber,
+    };
+    base.userId = user.id;
+  }
+  return { ...base, user };
 }

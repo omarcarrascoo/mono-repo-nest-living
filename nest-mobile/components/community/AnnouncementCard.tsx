@@ -11,12 +11,14 @@ interface AnnouncementCardProps {
   post: CommunityPost;
   onPress: () => void;
   onReact: (emoji: string) => void;
+  onDelete?: () => void;
 }
 
 export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
   post,
   onPress,
   onReact,
+  onDelete,
 }) => {
   const created = post.createdAt ? new Date(post.createdAt) : null;
   const subtitle = created ? formatRelative(created) : undefined;
@@ -71,6 +73,18 @@ export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
         <Text style={styles.ctaText}>Ver detalles</Text>
         <Feather name="arrow-right" size={14} color={COLORS.brand.tealDark} />
       </View>
+
+      {onDelete ? (
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={onDelete}
+          activeOpacity={0.85}
+          hitSlop={6}
+        >
+          <Feather name="trash-2" size={13} color="#dc2626" />
+          <Text style={styles.deleteText}>Eliminar aviso</Text>
+        </TouchableOpacity>
+      ) : null}
     </TouchableOpacity>
   );
 };
@@ -163,5 +177,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.brand.tealDark,
+  },
+  deleteBtn: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deleteText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#dc2626',
   },
 });

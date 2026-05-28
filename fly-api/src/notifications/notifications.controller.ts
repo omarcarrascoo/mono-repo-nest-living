@@ -11,12 +11,16 @@ import {
 } from '@nestjs/common';
 import {
   IsIn,
+  IsMongoId,
   IsOptional,
   IsString,
   Length,
+  ValidateIf,
 } from 'class-validator';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 
@@ -39,8 +43,30 @@ class ListNotificationsQueryDto {
   @IsOptional() @IsIn(['true', 'false']) unreadOnly?: string;
 }
 
+class BroadcastNotificationDto {
+  @IsString()
+  @Length(2, 100)
+  title: string;
+
+  @IsString()
+  @Length(2, 500)
+  body: string;
+
+  @IsIn(['all', 'unit', 'user'])
+  audience: 'all' | 'unit' | 'user';
+
+  @ValidateIf((o) => o.audience === 'unit')
+  @IsString()
+  @Length(1, 32)
+  unitPrefix?: string;
+
+  @ValidateIf((o) => o.audience === 'user')
+  @IsMongoId()
+  userId?: string;
+}
+
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 
@@ -94,5 +120,14 @@ export class NotificationsController {
   @Post('mark-all-read')
   markAllRead(@CurrentUser() user: CurrentUserPayload) {
     return this.notifications.markAllRead(user.userId);
+  }
+
+  @Post('broadcast')
+  @Roles('admin')
+  async broadcast(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: BroadcastNotificationDto,
+  ) {
+    return this.notifications.broadcast(user.residencyId, user.userId, dto);
   }
 }

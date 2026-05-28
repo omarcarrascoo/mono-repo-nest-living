@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ExpoPushMessage } from 'expo-server-sdk';
@@ -146,6 +151,65 @@ export class NotificationsService {
         .filter((u) => String(u._id) !== opts.excludeUserId)
         .map((u) => this.notifyUser(String(u._id), payload)),
     );
+  }
+
+  /**
+   * Admin-driven broadcast with audience filter (all | unit-prefix | single
+   * user). The sender is always excluded from the recipient set.
+   */
+  async broadcast(
+    residencyId: string,
+    senderUserId: string,
+    payload: {
+      title: string;
+      body: string;
+      audience: 'all' | 'unit' | 'user';
+      unitPrefix?: string;
+      userId?: string;
+    },
+  ) {
+    const notifyPayload: NotifyPayload = {
+      title: payload.title,
+      body: payload.body,
+      kind: 'admin_alert',
+      data: {
+        audience: payload.audience,
+        ...(payload.unitPrefix ? { unitPrefix: payload.unitPrefix } : {}),
+      },
+    };
+
+    let recipients: { _id: any }[] = [];
+    if (payload.audience === 'all') {
+      recipients = await this.usersService.findAllByResidency(residencyId);
+    } else if (payload.audience === 'unit') {
+      if (!payload.unitPrefix) {
+        throw new BadRequestException('unitPrefix required for audience=unit');
+      }
+      recipients = await this.usersService.findByResidencyAndUnitPrefix(
+        residencyId,
+        payload.unitPrefix,
+      );
+    } else if (payload.audience === 'user') {
+      if (!payload.userId) {
+        throw new BadRequestException('userId required for audience=user');
+      }
+      const target = await this.usersService.findById(payload.userId);
+      if (!target) throw new NotFoundException('User not found');
+      if (String((target as any).residencyId) !== residencyId) {
+        throw new NotFoundException('User not found');
+      }
+      recipients = [{ _id: (target as any)._id }];
+    }
+
+    const filtered = recipients.filter(
+      (r) => String(r._id) !== senderUserId,
+    );
+
+    await Promise.all(
+      filtered.map((r) => this.notifyUser(String(r._id), notifyPayload)),
+    );
+
+    return { sent: filtered.length, audience: payload.audience };
   }
 
   // ============================================================

@@ -16,6 +16,7 @@ import { AmenityCard, AmenityItem } from '@/components/amenities/AmenityCard';
 import { CategoryFilter, CategoryChip } from '@/components/ui/CategoryTabs';
 import { HeroSearch } from '@/components/ui/SearchBar';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
+import { AdminResidentsView } from '@/components/admin/AdminResidentsView';
 import { useAmenitiesStore } from '@/stores/amenities-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useCategoriesStore } from '@/stores/categories-store';
@@ -38,6 +39,7 @@ function toCard(item: Amenity): AmenityItem {
 export default function UnifiedAmenitiesScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
 
   const items = useAmenitiesStore((s) => s.items);
   const loading = useAmenitiesStore((s) => s.loading);
@@ -59,17 +61,26 @@ export default function UnifiedAmenitiesScreen() {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
 
-  // Initial loads
   useEffect(() => {
+    if (isAdmin) {
+      void fetchUnreadCount();
+      return;
+    }
     void fetchAll();
     void fetchCategories();
     if (!favoritesLoaded) void hydrateFavorites();
     void fetchUnreadCount();
-  }, [fetchAll, fetchCategories, favoritesLoaded, hydrateFavorites, fetchUnreadCount]);
+  }, [
+    isAdmin,
+    fetchAll,
+    fetchCategories,
+    favoritesLoaded,
+    hydrateFavorites,
+    fetchUnreadCount,
+  ]);
 
-  // Debounce solo la búsqueda de texto. La categoría se envía inmediatamente
-  // (un click no debería esperar 300ms para responder).
   useEffect(() => {
+    if (isAdmin) return;
     const handle = setTimeout(() => {
       setQuery({
         q: searchText.trim() ? searchText.trim() : undefined,
@@ -77,7 +88,7 @@ export default function UnifiedAmenitiesScreen() {
       });
     }, 300);
     return () => clearTimeout(handle);
-  }, [searchText, setQuery, activeCategoryId]);
+  }, [isAdmin, searchText, setQuery, activeCategoryId]);
 
   const handleSelectCategory = (id: string | null) => {
     setActiveCategoryId(id);
@@ -95,6 +106,38 @@ export default function UnifiedAmenitiesScreen() {
   const handleNavigation = (id: string) => {
     router.push(`../amenity/${id}`);
   };
+
+  if (isAdmin) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.background.base} />
+        <View style={styles.topSection}>
+          <SafeAreaView>
+            <DashboardHeader
+              avatarUrl={
+                user?.avatar ??
+                'https://i.pravatar.cc/150?u=a042581f4e29026024d'
+              }
+              userName={user?.fullName?.split(' ')[0] ?? 'Admin'}
+              location="Panel de administración"
+              hasUnread={unreadCount > 0}
+              onMenuPress={() => router.push('/notifications' as never)}
+            />
+            <View style={styles.adminHero}>
+              <Text style={styles.adminHeroEyebrow}>Residencia</Text>
+              <Text style={styles.adminHeroTitle}>Tu comunidad</Text>
+              <Text style={styles.adminHeroSubtitle}>
+                Gestiona residentes, busca por nombre o unidad y mándales avisos directos.
+              </Text>
+            </View>
+          </SafeAreaView>
+        </View>
+        <View style={styles.bottomSheet}>
+          <AdminResidentsView />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -206,5 +249,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.text.secondary,
     textAlign: 'center',
+  },
+  adminHero: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 4,
+    gap: 6,
+  },
+  adminHeroEyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.brand.teal,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  adminHeroTitle: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: COLORS.text.title,
+    letterSpacing: -0.5,
+  },
+  adminHeroSubtitle: {
+    fontSize: 14,
+    color: COLORS.text.subtitle,
+    lineHeight: 20,
+    marginTop: 2,
   },
 });

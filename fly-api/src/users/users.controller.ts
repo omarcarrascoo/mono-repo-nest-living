@@ -3,15 +3,17 @@ import {
   Controller,
   Get,
   NotFoundException,
-  Param,
   Patch,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, Length } from 'class-validator';
 
 class UpdatePreferencesDto {
   @IsOptional() @IsBoolean() reservationReminders?: boolean;
@@ -19,8 +21,15 @@ class UpdatePreferencesDto {
   @IsOptional() @IsBoolean() adminAlerts?: boolean;
 }
 
+class DirectoryQueryDto {
+  @IsOptional()
+  @IsString()
+  @Length(0, 80)
+  q?: string;
+}
+
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -43,5 +52,17 @@ export class UsersController {
     @Body() dto: UpdatePreferencesDto,
   ) {
     return this.usersService.updateNotificationPreferences(user.userId, dto as any);
+  }
+
+  @Get('directory')
+  @Roles('admin')
+  async directory(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: DirectoryQueryDto,
+  ) {
+    return this.usersService.listForResidencyDirectory(
+      user.residencyId,
+      query.q,
+    );
   }
 }

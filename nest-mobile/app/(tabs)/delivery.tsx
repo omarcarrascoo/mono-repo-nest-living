@@ -19,12 +19,16 @@ import { CategoryRail } from '@/components/delivery/CategoryRail';
 import { FeaturedProductCard } from '@/components/delivery/FeaturedProductCard';
 import { ProductCard } from '@/components/delivery/ProductCard';
 import { CartFAB } from '@/components/delivery/CartFAB';
+import { AdminDeliveryView } from '@/components/admin/AdminDeliveryView';
 import { useDeliveryStore } from '@/stores/delivery-store';
 import { cartSelectors, useCartStore } from '@/stores/cart-store';
+import { useAuthStore } from '@/stores/auth-store';
 import { useNotificationsStore } from '@/stores/notifications-store';
 
 export default function DeliveryScreen() {
   const router = useRouter();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === 'admin';
 
   const products = useDeliveryStore((s) => s.products);
   const categories = useDeliveryStore((s) => s.categories);
@@ -47,13 +51,16 @@ export default function DeliveryScreen() {
   const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
+    if (isAdmin) {
+      void fetchUnreadCount();
+      return;
+    }
     void fetchAll();
     void fetchUnreadCount();
-  }, [fetchAll, fetchUnreadCount]);
+  }, [isAdmin, fetchAll, fetchUnreadCount]);
 
-  // Debounce de la búsqueda; categoría se manda inmediato (mismo patrón
-  // que ya usamos en index.tsx para amenities).
   useEffect(() => {
+    if (isAdmin) return;
     const handle = setTimeout(() => {
       setQuery({
         q: searchText.trim() ? searchText.trim() : undefined,
@@ -61,7 +68,7 @@ export default function DeliveryScreen() {
       });
     }, 300);
     return () => clearTimeout(handle);
-  }, [searchText, activeCategoryId, setQuery]);
+  }, [isAdmin, searchText, activeCategoryId, setQuery]);
 
   const handleSelectCategory = (id: string | null) => {
     setActiveCategoryId(id);
@@ -76,6 +83,32 @@ export default function DeliveryScreen() {
     if (!product) return;
     addProduct(product, {}, 1);
   };
+
+  if (isAdmin) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.ui.white} />
+        <SafeAreaView style={{ flex: 1 }}>
+          <DashboardHeader
+            avatarUrl={user?.avatar ?? 'https://i.pravatar.cc/150?u=a042581f4e29026024d'}
+            userName={user?.fullName?.split(' ')[0] ?? 'Admin'}
+            location="Cocina y pedidos"
+            hasUnread={unreadCount > 0}
+            onMenuPress={() => router.push('/notifications' as never)}
+            variant="standard"
+          />
+          <View style={styles.adminHeroBlock}>
+            <Text style={styles.heroEyebrow}>Operación</Text>
+            <Text style={styles.adminHeroTitle}>Pedidos en vivo</Text>
+            <Text style={styles.adminHeroSubtitle}>
+              Avanza el estado de cada pedido y mantén tu menú al día.
+            </Text>
+          </View>
+          <AdminDeliveryView />
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -245,6 +278,23 @@ const styles = StyleSheet.create({
     color: COLORS.text.primary,
     lineHeight: 38,
     letterSpacing: -0.5,
+  },
+  adminHeroBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  adminHeroTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.text.primary,
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  adminHeroSubtitle: {
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    lineHeight: 18,
   },
   searchBar: {
     flexDirection: 'row',

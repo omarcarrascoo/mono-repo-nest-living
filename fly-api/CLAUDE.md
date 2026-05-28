@@ -87,6 +87,7 @@ PORT=3000
 | GET | `/users/me` | JWT | — | user del token (incluye `favorites`, `notificationPreferences`) |
 | GET | `/users/me/favorites` | JWT | — | `{ ids: string[] }` |
 | PATCH | `/users/me/notification-preferences` | JWT | — | `{ reservationReminders?, reservationUpdates?, adminAlerts? }` |
+| GET | `/users/directory` | JWT | admin | scoped, `?q=` (fullName/email/unitNumber), hasta 100 |
 | GET | `/categories` | JWT | — | scoped, ordenadas por sortOrder |
 | POST | `/categories` | JWT | admin | residencyId del token |
 | PUT | `/categories/:id` | JWT | admin | scoped (slug immutable) |
@@ -104,12 +105,15 @@ PORT=3000
 | GET | `/reservations/:id` | JWT | — | owner-only (admin override por residencia) |
 | PATCH | `/reservations/:id` | JWT | — | modifica startTime/notes (race-safe via tx) |
 | DELETE | `/reservations/:id` | JWT | — | cancel (status='cancelled', libera slot) |
+| GET | `/reservations/admin/all` | JWT | admin | scoped, `?filter=`, `?userId=`, `?amenityId=`, `?cursor=`, `?limit=` (1-100); populated amenity + user |
+| GET | `/reservations/admin/stats` | JWT | admin | `{ totals: {today, week, month}, topAmenities (top5), cancellationRate, hourOccupancy[24] }` ventanas relativas |
 | POST | `/notifications/register-token` | JWT | — | registra Expo Push Token |
 | DELETE | `/notifications/unregister-token` | JWT | — | quita Expo Push Token |
 | GET | `/notifications/me` | JWT | — | inbox in-app (`?unreadOnly='true'`) |
 | GET | `/notifications/me/unread-count` | JWT | — | `{ count }` para badge |
 | PATCH | `/notifications/:id/read` | JWT | — | marca leída (owner-only) |
 | POST | `/notifications/mark-all-read` | JWT | — | marca todo el inbox como leído |
+| POST | `/notifications/broadcast` | JWT | admin | `{ title, body, audience: 'all'\|'unit'\|'user', unitPrefix?, userId? }` → `{ sent, audience }` |
 | GET | `/delivery/categories` | JWT | — | scoped, con `productCount` |
 | POST | `/delivery/categories` | JWT | admin | scoped (slug único por residencia) |
 | PUT | `/delivery/categories/:id` | JWT | admin | scoped |

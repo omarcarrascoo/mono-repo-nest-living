@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
 import { useReservationsStore } from '@/stores/reservations-store';
 import { ReservationCard } from '@/components/reservations/ReservationCard';
+import { AdminReservationsView } from '@/components/admin/AdminReservationsView';
 import { getUserTimezone } from '@/lib/datetime';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -30,6 +31,7 @@ export default function ReservationsScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const tz = user?.timezone ?? getUserTimezone();
+  const isAdmin = user?.role === 'admin';
 
   const [activeFilter, setActiveFilter] = React.useState<FilterKey>('upcoming');
 
@@ -40,10 +42,35 @@ export default function ReservationsScreen() {
   const page = pages[activeFilter];
 
   useEffect(() => {
+    if (isAdmin) return;
     if (!page.loaded && !page.loading) {
       void fetchPage(activeFilter);
     }
-  }, [activeFilter, page.loaded, page.loading, fetchPage]);
+  }, [isAdmin, activeFilter, page.loaded, page.loading, fetchPage]);
+
+  if (isAdmin) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.background.base} />
+        <View style={styles.topSection}>
+          <SafeAreaView>
+            <View style={styles.headerRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.eyebrow}>Operaciones</Text>
+                <Text style={styles.title}>Reservas</Text>
+              </View>
+            </View>
+            <Text style={styles.heroSubtitle}>
+              Estadísticas en tiempo real, reservas activas y catálogo de amenidades.
+            </Text>
+          </SafeAreaView>
+        </View>
+        <View style={styles.bottomSheet}>
+          <AdminReservationsView timezone={tz} />
+        </View>
+      </View>
+    );
+  }
 
   const data = page.ids.map((id) => byId[id]).filter(Boolean);
 
@@ -252,5 +279,20 @@ const styles = StyleSheet.create({
   retryText: {
     color: '#fff',
     fontWeight: '700',
+  },
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.brand.teal,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    paddingHorizontal: 24,
+    paddingTop: 6,
+    fontSize: 14,
+    color: COLORS.text.subtitle,
+    lineHeight: 20,
   },
 });

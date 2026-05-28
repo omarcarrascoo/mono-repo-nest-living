@@ -441,3 +441,72 @@ export interface CreateReplyRequest {
   parentReplyId?: string;
   content: string;
 }
+
+// ============================================================
+// Admin
+// ============================================================
+
+export interface DirectoryUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: Role;
+  avatar?: string;
+  unitNumber?: string;
+}
+
+export interface AdminListReservationsParams {
+  filter?: 'upcoming' | 'past' | 'cancelled' | 'all';
+  userId?: string;
+  amenityId?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+/**
+ * Reserva en el panel admin: trae el usuario poblado (no solo `userId` string).
+ * Reusamos `Reservation` para los demás campos.
+ */
+export interface AdminReservation extends Reservation {
+  user?: {
+    id: string;
+    fullName: string;
+    email: string;
+    avatar?: string;
+    unitNumber?: string;
+  };
+}
+
+export interface AdminListReservationsResponse {
+  items: AdminReservation[];
+  nextCursor: string | null;
+}
+
+export type BroadcastAudience = 'all' | 'unit' | 'user';
+
+export interface BroadcastNotificationRequest {
+  title: string;
+  body: string;
+  audience: BroadcastAudience;
+  unitPrefix?: string;
+  userId?: string;
+}
+
+export interface BroadcastNotificationResponse {
+  sent: number;
+  audience: BroadcastAudience;
+}
+
+export interface AdminTopAmenity {
+  amenityId: string;
+  count: number;
+  title: string | null;
+}
+
+export interface AdminReservationStats {
+  totals: { today: number; week: number; month: number };
+  topAmenities: AdminTopAmenity[];
+  cancellationRate: number;
+  /** 24-element array, index = hour 0..23. */
+  hourOccupancy: number[];
+}

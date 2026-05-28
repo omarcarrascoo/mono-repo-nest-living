@@ -305,6 +305,32 @@
 						"description": "Actualiza las preferencias de notificaciones del usuario. Todos los campos son opcionales.\n\n- `reservationReminders` (bool) — recordatorio 15 min antes de la reserva.\n- `reservationUpdates` (bool) — confirmación al crear/modificar/cancelar reserva.\n- `adminAlerts` (bool, solo aplica a admins) — alertas globales del fraccionamiento.\n\nDevuelve el usuario completo actualizado."
 					},
 					"response": []
+				},
+				{
+					"name": "GET /users/directory (admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/directory?q=",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"directory"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "",
+									"description": "Busca por fullName, email o unitNumber (insensitive, regex-safe)."
+								}
+							]
+						},
+						"description": "Directorio de usuarios scoped por residencia del JWT. Solo `admin`.\n\nDevuelve hasta 100 usuarios ordenados por `fullName`, con `_id`, `email`, `fullName`, `role`, `avatar`, `unitNumber`. Sirve como picker para el broadcast por usuario y para listados administrativos del panel."
+					},
+					"response": []
 				}
 			]
 		},
@@ -867,6 +893,76 @@
 							]
 						},
 						"description": "Cancela la reserva (no la borra — `status` pasa a `'cancelled'`). Libera el slot para otros usuarios.\n\nIdempotente: si ya estaba cancelada devuelve la misma reserva sin error.\n\nDispara push notification de cancelación al usuario y al admin del fraccionamiento (si tiene `adminAlerts` activado).\n\n**404** si no es del usuario y no es admin."
+					},
+					"response": []
+				},
+				{
+					"name": "GET /reservations/admin/all (admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reservations/admin/all?filter=upcoming&limit=30",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"reservations",
+								"admin",
+								"all"
+							],
+							"query": [
+								{
+									"key": "filter",
+									"value": "upcoming",
+									"description": "'upcoming' (default) | 'past' | 'cancelled' | 'all'"
+								},
+								{
+									"key": "userId",
+									"value": "",
+									"description": "Filtra por usuario (Mongo ObjectId).",
+									"disabled": true
+								},
+								{
+									"key": "amenityId",
+									"value": "",
+									"description": "Filtra por amenidad (Mongo ObjectId).",
+									"disabled": true
+								},
+								{
+									"key": "cursor",
+									"value": "",
+									"description": "ISO-8601 startTime del último item de la página anterior.",
+									"disabled": true
+								},
+								{
+									"key": "limit",
+									"value": "30",
+									"description": "1-100 (default 30)"
+								}
+							]
+						},
+						"description": "Listado de reservas del fraccionamiento para el admin.\n\nMismo shape que `GET /reservations` pero scoped por `residencyId` del JWT (no por owner). Permite filtrar por `userId` y/o `amenityId`. Cada item viene con `amenityId` poblado (`title`, `image`, `location`) y `userId` poblado (`fullName`, `email`, `avatar`, `unitNumber`) para evitar N+1 en el panel admin.\n\nResponse:\n```json\n{ \"items\": [Reservation, ...], \"nextCursor\": \"...\" | null }\n```\n\nSolo `admin`."
+					},
+					"response": []
+				},
+				{
+					"name": "GET /reservations/admin/stats (admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/reservations/admin/stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"reservations",
+								"admin",
+								"stats"
+							]
+						},
+						"description": "Stats del dashboard admin de reservaciones, scoped por residencyId.\n\nVentanas relativas (últimas 24h / 7d / 30d), no calendario natural.\n\nResponse:\n```json\n{\n  \"totals\": { \"today\": 5, \"week\": 32, \"month\": 128 },\n  \"topAmenities\": [{ \"amenityId\": \"...\", \"title\": \"Alberca\", \"count\": 42 }, ...],\n  \"cancellationRate\": 0.12,\n  \"hourOccupancy\": [0,0,0,...,4,8,12,...]\n}\n```\n\n`hourOccupancy` es un array de 24 enteros (0-23) con conteo de reservas confirmed+completed cuyo `startTime` cae en esa hora durante los últimos 30 días.\n\nSolo `admin`."
 					},
 					"response": []
 				}
@@ -1562,6 +1658,34 @@
 							]
 						},
 						"description": "Marca todas las notificaciones del inbox como leídas. Devuelve `{ modified: number }`."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /notifications/broadcast (admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Mantenimiento de alberca\",\n  \"body\": \"La alberca estará cerrada el sábado 5 de junio de 8 a 14 hrs por limpieza profunda.\",\n  \"audience\": \"all\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/notifications/broadcast",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								"broadcast"
+							]
+						},
+						"description": "Envío de notificación masiva por parte del admin al fraccionamiento.\n\n**Body:**\n- `title` (string, 2-100, requerido)\n- `body` (string, 2-500, requerido)\n- `audience` ('all' | 'unit' | 'user', requerido)\n- `unitPrefix` (string, requerido si `audience='unit'`) — prefijo del `unitNumber` (regex-safe). Ej. `\"A\"` para todos los de la torre A.\n- `userId` (Mongo ObjectId, requerido si `audience='user'`) — debe pertenecer a la misma residencia que el admin.\n\n**Response:** `{ sent: number, audience: 'all'|'unit'|'user' }`\n\nEl sender (admin que dispara) siempre se excluye de los recipients. Cada notificación cae en el inbox de cada destinatario con `kind='admin_alert'` y se manda push si tienen token registrado.\n\n**Errores:**\n- 400 — `unitPrefix` faltante con `audience='unit'`, o `userId` faltante con `audience='user'`\n- 404 — `userId` no existe o pertenece a otra residencia\n- 403 — caller no es admin\n\nSolo `admin`."
 					},
 					"response": []
 				}

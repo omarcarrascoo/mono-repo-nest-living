@@ -11,9 +11,12 @@ import {
 } from '@nestjs/common';
 import { ReservationsService } from './reservations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import {
+  AdminListReservationsQueryDto,
   CreateReservationDto,
   ListReservationsQueryDto,
   UpdateReservationDto,
@@ -21,7 +24,7 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Controller('reservations')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ReservationsController {
   constructor(
     private readonly reservations: ReservationsService,
@@ -55,6 +58,28 @@ export class ReservationsController {
       cursor: query.cursor,
       limit: Math.min(Math.max(query.limit ?? 20, 1), 50),
     });
+  }
+
+  @Get('admin/all')
+  @Roles('admin')
+  listAll(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query() query: AdminListReservationsQueryDto,
+  ) {
+    return this.reservations.listForResidency({
+      residencyId: user.residencyId,
+      filter: query.filter ?? 'upcoming',
+      userId: query.userId,
+      amenityId: query.amenityId,
+      cursor: query.cursor,
+      limit: Math.min(Math.max(query.limit ?? 30, 1), 100),
+    });
+  }
+
+  @Get('admin/stats')
+  @Roles('admin')
+  stats(@CurrentUser() user: CurrentUserPayload) {
+    return this.reservations.getAdminStats(user.residencyId);
   }
 
   @Get(':id')
