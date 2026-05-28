@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Text,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS } from '@/constants/theme';
@@ -60,6 +61,23 @@ export default function UnifiedAmenitiesScreen() {
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
+
+  const adminScrollY = useRef(new Animated.Value(0)).current;
+  const sheetTranslate = adminScrollY.interpolate({
+    inputRange: [0, 120],
+    outputRange: [0, -28],
+    extrapolate: 'clamp',
+  });
+  const heroOpacity = adminScrollY.interpolate({
+    inputRange: [0, 80, 140],
+    outputRange: [1, 0.6, 0],
+    extrapolate: 'clamp',
+  });
+  const heroTranslate = adminScrollY.interpolate({
+    inputRange: [0, 140],
+    outputRange: [0, -16],
+    extrapolate: 'clamp',
+  });
 
   useEffect(() => {
     if (isAdmin) {
@@ -123,18 +141,31 @@ export default function UnifiedAmenitiesScreen() {
               hasUnread={unreadCount > 0}
               onMenuPress={() => router.push('/notifications' as never)}
             />
-            <View style={styles.adminHero}>
+            <Animated.View
+              style={[
+                styles.adminHero,
+                {
+                  opacity: heroOpacity,
+                  transform: [{ translateY: heroTranslate }],
+                },
+              ]}
+            >
               <Text style={styles.adminHeroEyebrow}>Residencia</Text>
               <Text style={styles.adminHeroTitle}>Tu comunidad</Text>
               <Text style={styles.adminHeroSubtitle}>
                 Gestiona residentes, busca por nombre o unidad y mándales avisos directos.
               </Text>
-            </View>
+            </Animated.View>
           </SafeAreaView>
         </View>
-        <View style={styles.bottomSheet}>
-          <AdminResidentsView />
-        </View>
+        <Animated.View
+          style={[
+            styles.bottomSheet,
+            { transform: [{ translateY: sheetTranslate }] },
+          ]}
+        >
+          <AdminResidentsView scrollY={adminScrollY} />
+        </Animated.View>
       </View>
     );
   }

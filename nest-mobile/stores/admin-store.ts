@@ -76,6 +76,17 @@ interface AdminState {
 
   fetchDirectory: (q?: string) => Promise<void>;
   setDirectoryQuery: (q: string) => void;
+  updateDirectoryUser: (
+    id: string,
+    payload: {
+      fullName?: string;
+      role?: 'admin' | 'user' | 'kitchen_operator';
+      unitNumber?: string | null;
+      avatar?: string | null;
+      status?: string;
+    },
+  ) => Promise<DirectoryUser>;
+  deleteDirectoryUser: (id: string) => Promise<void>;
 
   sendBroadcast: (
     payload: BroadcastNotificationRequest,
@@ -375,6 +386,21 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   },
 
   setDirectoryQuery: (q) => set({ directoryQuery: q }),
+
+  updateDirectoryUser: async (id, payload) => {
+    const updated = await adminService.updateUser(id, payload);
+    set((s) => ({
+      directory: s.directory.map((u) => (u.id === id ? updated : u)),
+    }));
+    return updated;
+  },
+
+  deleteDirectoryUser: async (id) => {
+    await adminService.deleteUser(id);
+    set((s) => ({
+      directory: s.directory.filter((u) => u.id !== id),
+    }));
+  },
 
   sendBroadcast: async (payload) => {
     if (get().broadcasting) {

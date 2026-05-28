@@ -51,6 +51,27 @@ export const adminService = {
     return Array.isArray(raw) ? raw.map(adaptDirectoryUser) : [];
   },
 
+  async updateUser(
+    id: string,
+    payload: {
+      fullName?: string;
+      role?: 'admin' | 'user' | 'kitchen_operator';
+      unitNumber?: string | null;
+      avatar?: string | null;
+      status?: string;
+    },
+  ): Promise<DirectoryUser> {
+    const raw = await apiFetch<any>(`/users/${id}`, {
+      method: 'PATCH',
+      body: payload,
+    });
+    return adaptDirectoryUser(raw);
+  },
+
+  async deleteUser(id: string): Promise<{ ok: true }> {
+    return apiFetch<{ ok: true }>(`/users/${id}`, { method: 'DELETE' });
+  },
+
   // ----- Reservations -----
   async listReservations(
     params: AdminListReservationsParams = {},

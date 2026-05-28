@@ -331,6 +331,65 @@
 						"description": "Directorio de usuarios scoped por residencia del JWT. Solo `admin`.\n\nDevuelve hasta 100 usuarios ordenados por `fullName`, con `_id`, `email`, `fullName`, `role`, `avatar`, `unitNumber`. Sirve como picker para el broadcast por usuario y para listados administrativos del panel."
 					},
 					"response": []
+				},
+				{
+					"name": "PATCH /users/:id (admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Lucía Hernández\",\n  \"role\": \"user\",\n  \"unitNumber\": \"B-204\",\n  \"avatar\": \"https://example.com/avatar.jpg\",\n  \"status\": \"ACTIVE\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						},
+						"description": "Actualiza un usuario de la residencia. Solo `admin`. Scoped por `residencyId` del JWT.\n\nCampos opcionales (todos):\n- `fullName` (string, 1-120).\n- `role` ('admin' | 'user' | 'kitchen_operator').\n- `unitNumber` (string | null) — `null` lo limpia.\n- `avatar` (string | null) — `null` lo limpia.\n- `status` (string, 1-40).\n\nDevuelve el usuario actualizado sin `password`. 404 si no existe en la residencia."
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE /users/:id (admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						},
+						"description": "Elimina un usuario de la residencia. Solo `admin`. Scoped por `residencyId` del JWT.\n\n- 403 si intentas borrarte a ti mismo.\n- 404 si el usuario no existe o no pertenece a tu residencia.\n\nResponse: `{ ok: true }`."
+					},
+					"response": []
 				}
 			]
 		},

@@ -88,6 +88,8 @@ PORT=3000
 | GET | `/users/me/favorites` | JWT | — | `{ ids: string[] }` |
 | PATCH | `/users/me/notification-preferences` | JWT | — | `{ reservationReminders?, reservationUpdates?, adminAlerts? }` |
 | GET | `/users/directory` | JWT | admin | scoped, `?q=` (fullName/email/unitNumber), hasta 100 |
+| PATCH | `/users/:id` | JWT | admin | scoped, body parcial: `fullName?`, `role?`, `unitNumber?`, `avatar?`, `status?` |
+| DELETE | `/users/:id` | JWT | admin | scoped; 403 si es uno mismo |
 | GET | `/categories` | JWT | — | scoped, ordenadas por sortOrder |
 | POST | `/categories` | JWT | admin | residencyId del token |
 | PUT | `/categories/:id` | JWT | admin | scoped (slug immutable) |

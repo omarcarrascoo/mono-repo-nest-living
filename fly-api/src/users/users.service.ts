@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from './schemas/user.schema';
@@ -122,5 +127,57 @@ export class UsersService {
       .select('-password');
     if (!updated) throw new NotFoundException('User not found');
     return updated;
+  }
+
+  async updateAsAdmin(
+    residencyId: string,
+    targetUserId: string,
+    dto: {
+      fullName?: string;
+      role?: 'admin' | 'user' | 'kitchen_operator';
+      unitNumber?: string | null;
+      avatar?: string | null;
+      status?: string;
+    },
+  ): Promise<User> {
+    if (!Types.ObjectId.isValid(targetUserId)) {
+      throw new BadRequestException('Invalid user id');
+    }
+    const user = await this.userModel.findOne({
+      _id: targetUserId,
+      residencyId,
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (dto.fullName !== undefined) user.fullName = dto.fullName;
+    if (dto.role !== undefined) user.role = dto.role;
+    if (dto.unitNumber !== undefined) user.unitNumber = dto.unitNumber ?? '';
+    if (dto.avatar !== undefined) user.avatar = dto.avatar ?? '';
+    if (dto.status !== undefined) user.status = dto.status;
+
+    await user.save();
+    const sanitized = user.toObject();
+    delete (sanitized as any).password;
+    return sanitized as User;
+  }
+
+  async removeAsAdmin(
+    residencyId: string,
+    actorUserId: string,
+    targetUserId: string,
+  ): Promise<{ ok: true }> {
+    if (!Types.ObjectId.isValid(targetUserId)) {
+      throw new BadRequestException('Invalid user id');
+    }
+    if (String(actorUserId) === String(targetUserId)) {
+      throw new ForbiddenException('Cannot delete yourself');
+    }
+    const user = await this.userModel.findOne({
+      _id: targetUserId,
+      residencyId,
+    });
+    if (!user) throw new NotFoundException('User not found');
+    await user.deleteOne();
+    return { ok: true };
   }
 }

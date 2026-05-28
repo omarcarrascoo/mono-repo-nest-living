@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
@@ -13,6 +12,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Animated,
+  ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -23,6 +24,8 @@ import { DirectoryUser, Role } from '@/types/api';
 interface AdminResidentsViewProps {
   /** Render at the top inside the sheet, above the search bar. */
   header?: React.ReactNode;
+  /** Animated value for parallax effect on the parent sheet. Optional. */
+  scrollY?: Animated.Value;
 }
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -37,11 +40,22 @@ const ROLE_COLOR: Record<Role, { bg: string; fg: string }> = {
   kitchen_operator: { bg: '#e0e7ff', fg: '#4338ca' },
 };
 
+const ROLE_CHIPS: { value: Role; label: string }[] = [
+  { value: 'user', label: 'Residente' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'kitchen_operator', label: 'Cocina' },
+];
+
 function avatarFallback(name: string) {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0F766E&color=fff`;
 }
 
-export function AdminResidentsView({ header }: AdminResidentsViewProps) {
+const AnimatedFlatList = Animated.createAnimatedComponent(
+  // FlatList type is fine but this avoids importing the type directly
+  require('react-native').FlatList,
+);
+
+export function AdminResidentsView({ header, scrollY }: AdminResidentsViewProps) {
   const directory = useAdminStore((s) => s.directory);
   const loading = useAdminStore((s) => s.directoryLoading);
   const error = useAdminStore((s) => s.directoryError);
@@ -49,6 +63,9 @@ export function AdminResidentsView({ header }: AdminResidentsViewProps) {
 
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<DirectoryUser | null>(null);
+
+  const fallbackScrollY = useRef(new Animated.Value(0)).current;
+  const scroll = scrollY ?? fallbackScrollY;
 
   useEffect(() => {
     void fetchDirectory();
@@ -75,9 +92,9 @@ export function AdminResidentsView({ header }: AdminResidentsViewProps) {
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <AnimatedFlatList
         data={directory}
-        keyExtractor={(u) => u.id}
+        keyExtractor={(u: DirectoryUser) => u.id}
         ListHeaderComponent={
           <View>
             {header}
@@ -128,11 +145,16 @@ export function AdminResidentsView({ header }: AdminResidentsViewProps) {
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }: { item: DirectoryUser }) => (
           <ResidentRow user={item} onPress={() => setSelected(item)} />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.listContent}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scroll } } }],
+          { useNativeDriver: false },
+        )}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={loading && directory.length > 0}
@@ -243,6 +265,8 @@ function ResidentRow({
   );
 }
 
+type SheetMode = 'menu' | 'compose' | 'edit';
+
 function ResidentActionsSheet({
   user,
   onClose,
@@ -252,22 +276,39 @@ function ResidentActionsSheet({
 }) {
   const sendBroadcast = useAdminStore((s) => s.sendBroadcast);
   const broadcasting = useAdminStore((s) => s.broadcasting);
-  const [composing, setComposing] = useState(false);
+  const updateDirectoryUser = useAdminStore((s) => s.updateDirectoryUser);
+  const deleteDirectoryUser = useAdminStore((s) => s.deleteDirectoryUser);
+
+  const [mode, setMode] = useState<SheetMode>('menu');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
 
+  const [editName, setEditName] = useState('');
+  const [editUnit, setEditUnit] = useState('');
+  const [editRole, setEditRole] = useState<Role>('user');
+  const [editAvatar, setEditAvatar] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+
   useEffect(() => {
     if (!user) {
-      setComposing(false);
+      setMode('menu');
       setTitle('');
       setBody('');
+      setSaving(false);
+      setRemoving(false);
+      return;
     }
+    setEditName(user.fullName ?? '');
+    setEditUnit(user.unitNumber ?? '');
+    setEditRole(user.role);
+    setEditAvatar(user.avatar ?? '');
   }, [user]);
 
   if (!user) return null;
   const roleColor = ROLE_COLOR[user.role];
 
-  const handleSend = async () => {
+  const handleSendNotification = async () => {
     if (!title.trim() || !body.trim()) {
       Alert.alert('Datos faltantes', 'Necesitamos un título y un cuerpo.');
       return;
@@ -284,6 +325,52 @@ function ResidentActionsSheet({
     } catch (e: any) {
       Alert.alert('No se pudo enviar', e?.message ?? 'Intenta de nuevo.');
     }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editName.trim()) {
+      Alert.alert('Nombre requerido', 'El nombre no puede estar vacío.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateDirectoryUser(user.id, {
+        fullName: editName.trim(),
+        role: editRole,
+        unitNumber: editUnit.trim() ? editUnit.trim() : null,
+        avatar: editAvatar.trim() ? editAvatar.trim() : null,
+      });
+      Alert.alert('Listo', 'Cambios guardados.');
+      onClose();
+    } catch (e: any) {
+      Alert.alert('No se pudo guardar', e?.message ?? 'Intenta de nuevo.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Eliminar usuario',
+      `Esto eliminará a ${user.fullName} de la residencia. Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            setRemoving(true);
+            try {
+              await deleteDirectoryUser(user.id);
+              onClose();
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'No se pudo eliminar.');
+              setRemoving(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -315,69 +402,176 @@ function ResidentActionsSheet({
               </Text>
             </View>
           </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={8}>
             <Feather name="x" size={20} color={COLORS.text.primary} />
           </TouchableOpacity>
         </View>
 
-        {composing ? (
-          <View style={styles.composeBox}>
-            <Text style={styles.composeTitle}>Notificar a {user.fullName.split(' ')[0]}</Text>
-            <TextInput
-              style={styles.composeTitleInput}
-              placeholder="Título"
-              placeholderTextColor={COLORS.text.label}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={80}
-            />
-            <TextInput
-              style={styles.composeBodyInput}
-              placeholder="Mensaje"
-              placeholderTextColor={COLORS.text.label}
-              value={body}
-              onChangeText={setBody}
-              multiline
-              maxLength={300}
-            />
-            <View style={styles.composeActions}>
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={styles.sheetScrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {mode === 'compose' ? (
+            <View style={styles.composeBox}>
+              <Text style={styles.composeTitle}>
+                Notificar a {user.fullName.split(' ')[0]}
+              </Text>
+              <TextInput
+                style={styles.composeTitleInput}
+                placeholder="Título"
+                placeholderTextColor={COLORS.text.label}
+                value={title}
+                onChangeText={setTitle}
+                maxLength={80}
+              />
+              <TextInput
+                style={styles.composeBodyInput}
+                placeholder="Mensaje"
+                placeholderTextColor={COLORS.text.label}
+                value={body}
+                onChangeText={setBody}
+                multiline
+                maxLength={300}
+              />
+              <View style={styles.composeActions}>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => setMode('menu')}
+                  disabled={broadcasting}
+                >
+                  <Text style={styles.secondaryBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.primaryBtn, broadcasting && { opacity: 0.6 }]}
+                  onPress={handleSendNotification}
+                  disabled={broadcasting}
+                >
+                  {broadcasting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Enviar</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : mode === 'edit' ? (
+            <View style={styles.composeBox}>
+              <Text style={styles.composeTitle}>Editar residente</Text>
+
+              <Text style={styles.fieldLabel}>Nombre</Text>
+              <TextInput
+                style={styles.composeTitleInput}
+                placeholder="Nombre completo"
+                placeholderTextColor={COLORS.text.label}
+                value={editName}
+                onChangeText={setEditName}
+                maxLength={120}
+              />
+
+              <Text style={styles.fieldLabel}>Unidad</Text>
+              <TextInput
+                style={styles.composeTitleInput}
+                placeholder="Ej. A-204 (opcional)"
+                placeholderTextColor={COLORS.text.label}
+                value={editUnit}
+                onChangeText={setEditUnit}
+                maxLength={40}
+                autoCapitalize="characters"
+              />
+
+              <Text style={styles.fieldLabel}>Avatar (URL)</Text>
+              <TextInput
+                style={styles.composeTitleInput}
+                placeholder="https://… (opcional)"
+                placeholderTextColor={COLORS.text.label}
+                value={editAvatar}
+                onChangeText={setEditAvatar}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+
+              <Text style={styles.fieldLabel}>Rol</Text>
+              <View style={styles.chipRow}>
+                {ROLE_CHIPS.map((opt) => {
+                  const active = editRole === opt.value;
+                  return (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={() => setEditRole(opt.value)}
+                      style={[styles.chip, active && styles.chipActive]}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.composeActions}>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => setMode('menu')}
+                  disabled={saving}
+                >
+                  <Text style={styles.secondaryBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
+                  onPress={handleSaveEdit}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Guardar</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.actionList}>
+              <ActionButton
+                icon="bell"
+                label="Enviar notificación push"
+                description="Push individual a este usuario"
+                onPress={() => setMode('compose')}
+              />
+              <ActionButton
+                icon="edit-3"
+                label="Editar datos"
+                description="Nombre, rol, unidad y avatar"
+                onPress={() => setMode('edit')}
+              />
+              <ActionButton
+                icon="mail"
+                label="Copiar correo"
+                description={user.email}
+                onPress={() => {
+                  Alert.alert('Correo', user.email);
+                }}
+              />
               <TouchableOpacity
-                style={styles.secondaryBtn}
-                onPress={() => setComposing(false)}
+                style={[styles.dangerBtn, removing && { opacity: 0.6 }]}
+                onPress={handleDelete}
+                disabled={removing}
+                activeOpacity={0.85}
               >
-                <Text style={styles.secondaryBtnText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.primaryBtn, broadcasting && { opacity: 0.6 }]}
-                onPress={handleSend}
-                disabled={broadcasting}
-              >
-                {broadcasting ? (
-                  <ActivityIndicator color="#fff" />
+                {removing ? (
+                  <ActivityIndicator color="#dc2626" />
                 ) : (
-                  <Text style={styles.primaryBtnText}>Enviar</Text>
+                  <>
+                    <Feather name="trash-2" size={16} color="#dc2626" />
+                    <Text style={styles.dangerBtnText}>Eliminar usuario</Text>
+                  </>
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        ) : (
-          <View style={styles.actionList}>
-            <ActionButton
-              icon="bell"
-              label="Enviar notificación push"
-              description="Push individual a este usuario"
-              onPress={() => setComposing(true)}
-            />
-            <ActionButton
-              icon="mail"
-              label="Copiar correo"
-              description={user.email}
-              onPress={() => {
-                Alert.alert('Correo', user.email);
-              }}
-            />
-          </View>
-        )}
+          )}
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -412,7 +606,7 @@ function ActionButton({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  listContent: { paddingHorizontal: 20, paddingBottom: 32 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 160 },
 
   statsRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   statCard: {
@@ -559,10 +753,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.ui.lightSheet,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingBottom: 32,
     paddingTop: 8,
-    gap: 16,
+    maxHeight: '88%',
   },
   modalHandle: {
     alignSelf: 'center',
@@ -577,6 +769,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.light.border,
   },
   sheetAvatar: {
     width: 56,
@@ -604,6 +800,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.light.border,
   },
 
+  sheetScroll: { flexGrow: 0 },
+  sheetScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    gap: 16,
+  },
+
   actionList: { gap: 10 },
   actionBtn: {
     flexDirection: 'row',
@@ -625,6 +829,20 @@ const styles = StyleSheet.create({
   },
   actionLabel: { fontSize: 15, fontWeight: '600', color: COLORS.text.primary },
   actionDescription: { fontSize: 12, color: COLORS.text.label, marginTop: 2 },
+
+  dangerBtn: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  dangerBtnText: { color: '#dc2626', fontWeight: '800', fontSize: 14 },
 
   composeBox: {
     backgroundColor: COLORS.light.card,
@@ -657,10 +875,39 @@ const styles = StyleSheet.create({
     minHeight: 96,
     textAlignVertical: 'top',
   },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.text.label,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 4,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+  },
+  chipActive: {
+    backgroundColor: COLORS.brand.tealDark,
+    borderColor: COLORS.brand.tealDark,
+  },
+  chipText: { fontSize: 13, fontWeight: '600', color: COLORS.text.primary },
+  chipTextActive: { color: '#fff' },
+
   composeActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 10,
+    marginTop: 4,
   },
   secondaryBtn: {
     paddingHorizontal: 16,
