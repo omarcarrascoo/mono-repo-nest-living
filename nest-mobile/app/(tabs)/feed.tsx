@@ -15,7 +15,6 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ToggleRow } from '@/components/ui/ToggleRow';
 import { COLORS } from '@/constants/theme';
-import { SectionHeader } from '@/components/ui/SectionHeader';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
 import { useNotificationsStore } from '@/stores/notifications-store';
 import { useCommunityStore, CommunityFilter } from '@/stores/community-store';
@@ -23,6 +22,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { PostComposerTrigger } from '@/components/community/PostComposerTrigger';
 import { AnnouncementCard } from '@/components/community/AnnouncementCard';
 import { PostCard } from '@/components/community/PostCard';
+import { PinnedCarousel } from '@/components/community/PinnedCarousel';
 import { BroadcastComposer } from '@/components/admin/BroadcastComposer';
 
 const TABS: Array<{ label: string; filter: CommunityFilter }> = [
@@ -61,6 +61,16 @@ export default function FeedUnifiedScreen() {
     const replies = items.reduce((sum, p) => sum + (p.repliesCount ?? 0), 0);
     return { announcements, posts, replies };
   }, [isAdmin, items]);
+
+  const { pinnedItems, timelineItems } = useMemo(() => {
+    const pinned: typeof items = [];
+    const timeline: typeof items = [];
+    for (const p of items) {
+      if (p.pinned) pinned.push(p);
+      else timeline.push(p);
+    }
+    return { pinnedItems: pinned, timelineItems: timeline };
+  }, [items]);
 
   useEffect(() => {
     void fetchUnreadCount();
@@ -193,19 +203,20 @@ export default function FeedUnifiedScreen() {
             </View>
           ) : null}
 
-          <SectionHeader
-            title={isAdmin ? 'Publicaciones' : 'Conversaciones'}
-            rightAction={
-              <TouchableOpacity
-                style={styles.filterChip}
-                onPress={() => void refreshPosts()}
-                activeOpacity={0.85}
-              >
-                <Feather name="refresh-cw" size={14} color={COLORS.text.primary} />
-                <Text style={styles.filterChipText}>Refrescar</Text>
-              </TouchableOpacity>
-            }
-          />
+          <PinnedCarousel items={pinnedItems} onPressItem={handleOpenPost} />
+
+          <View style={styles.timelineHeaderRow}>
+            <Text style={styles.timelineTitle}>
+              {isAdmin ? 'Publicaciones' : 'Conversaciones'}
+            </Text>
+            <TouchableOpacity
+              style={styles.filterChip}
+              onPress={() => void refreshPosts()}
+              activeOpacity={0.85}
+            >
+              <Feather name="refresh-cw" size={13} color={COLORS.text.label} />
+            </TouchableOpacity>
+          </View>
 
           <PostComposerTrigger
             avatarUrl={user?.avatar}
@@ -233,7 +244,7 @@ export default function FeedUnifiedScreen() {
                 <Text style={styles.retryText}>Reintentar</Text>
               </TouchableOpacity>
             </View>
-          ) : items.length === 0 ? (
+          ) : timelineItems.length === 0 && pinnedItems.length === 0 ? (
             <View style={styles.emptyBox}>
               <Feather
                 name="message-circle"
@@ -249,9 +260,15 @@ export default function FeedUnifiedScreen() {
                 <Text style={styles.emptyCtaText}>Escribir publicación</Text>
               </TouchableOpacity>
             </View>
+          ) : timelineItems.length === 0 ? (
+            <View style={styles.softHint}>
+              <Text style={styles.softHintText}>
+                Sólo hay avisos fijados ahora mismo. ¡Inicia la conversación!
+              </Text>
+            </View>
           ) : (
-            <View style={{ marginTop: 8 }}>
-              {items.map((post) => {
+            <View style={styles.timeline}>
+              {timelineItems.map((post) => {
                 const canDelete = isAdmin || post.author.id === user?.id;
                 const onDelete =
                   canDelete && deletingId !== post.id
@@ -398,20 +415,44 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   broadcastFabText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  filterChip: {
+  timelineHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.text.label,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  timeline: {
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.light.border,
+  },
+  softHint: {
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  softHintText: {
+    fontSize: 13,
+    color: COLORS.text.label,
+    textAlign: 'center',
+  },
+  filterChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.light.border,
-  },
-  filterChipText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.text.primary,
   },
   statusBox: {
     alignItems: 'center',
