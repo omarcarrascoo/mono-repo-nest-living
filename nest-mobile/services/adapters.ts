@@ -95,11 +95,15 @@ export function adaptClub(raw: Raw): Club {
 }
 
 export function adaptMembership(raw: Raw): Membership {
-  // El backend popula `userId` (raw object) cuando hace falta — acá solo
-  // necesitamos el clubId resuelto y el club poblado si vino.
+  // El BE puede mandar:
+  // (a) `GET /clubs/me/memberships` → { clubId: string, club: {...} }   (flat)
+  // (b) Mongoose populate raw         → { clubId: { _id, name, ... } }  (nested)
+  // Soportamos ambos.
   let clubId = '';
   let club: Membership['club'];
+
   if (raw.clubId && typeof raw.clubId === 'object') {
+    // Shape (b): clubId es un objeto poblado.
     clubId = String(raw.clubId._id ?? raw.clubId.id ?? '');
     club = {
       id: clubId,
@@ -107,15 +111,24 @@ export function adaptMembership(raw: Raw): Membership {
       privacy: (raw.clubId.privacy ?? 'public') as ClubPrivacy,
     };
   } else {
+    // Shape (a): clubId es string, el club viene en `raw.club`.
     clubId = String(raw.clubId ?? '');
+    if (raw.club && typeof raw.club === 'object') {
+      club = {
+        id: String(raw.club.id ?? raw.club._id ?? clubId),
+        name: raw.club.name ?? '',
+        privacy: (raw.club.privacy ?? 'public') as ClubPrivacy,
+      };
+    }
   }
+
   return {
     id: raw._id ?? raw.id,
     userId: raw.userId ? String(raw.userId._id ?? raw.userId.id ?? raw.userId) : '',
     clubId,
     role: (raw.role ?? 'user') as Role,
     status: (raw.status ?? 'pending') as MembershipStatus,
-    unitNumber: raw.unitNumber,
+    unitNumber: raw.unitNumber ?? undefined,
     approvedAt: raw.approvedAt,
     createdAt: raw.createdAt,
     club,

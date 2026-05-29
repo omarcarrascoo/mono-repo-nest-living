@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -6,9 +6,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
+  TextInput,
   Switch,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
@@ -44,6 +47,8 @@ const EMPTY_LEASE: ResidentLease = {
   daysLeft: 0,
 };
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 function toProfile(u: AuthUser, unitNumber?: string): UserProfile {
   return {
     id: u.id,
@@ -54,11 +59,7 @@ function toProfile(u: AuthUser, unitNumber?: string): UserProfile {
     status: (u.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE') as
       | 'ACTIVE'
       | 'INACTIVE',
-    // Si no hay avatar real, lo dejamos vacío y el `<Avatar>` dibuja iniciales.
     avatar: u.avatar ?? '',
-    // Stats / lease / contacts / documents ya no viven en User — son datos
-    // que un día el club tendrá scope-ado por Membership. Por ahora mostramos
-    // valores vacíos para no romper la UI.
     stats: { ...EMPTY_STATS },
     lease: { ...EMPTY_LEASE },
     contacts: [] as ResidentContact[],
@@ -84,6 +85,13 @@ const InfoRow = ({ icon, label, value }: InfoRowProps) => (
   </View>
 );
 
+function formatDOBInput(input: string): string {
+  const digits = input.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
 export default function UserProfileScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -96,7 +104,24 @@ export default function UserProfileScreen() {
   );
 
   const [refreshing, setRefreshing] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDob, setEditDob] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const prefs = user?.notificationPreferences;
+  const [reservationReminders, setReservationReminders] = useState(true);
+  const [reservationUpdates, setReservationUpdates] = useState(true);
+  const [adminAlerts, setAdminAlerts] = useState(true);
+  const [savingPref, setSavingPref] = useState<string | null>(null);
+
+  // Sync local toggles with backend prefs whenever they change.
+  useEffect(() => {
+    if (!prefs) return;
+    setReservationReminders(prefs.reservationReminders ?? true);
+    setReservationUpdates(prefs.reservationUpdates ?? true);
+    setAdminAlerts(prefs.adminAlerts ?? true);
+  }, [prefs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +135,81 @@ export default function UserProfileScreen() {
       cancelled = true;
     };
   }, [refreshUser]);
+
+  const startEdit = () => {
+    if (!user) return;
+    setEditName(user.fullName ?? '');
+    setEditDob(user.dateOfBirth ?? '');
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditName('');
+    setEditDob('');
+  };
+
+  const saveProfile = async () => {
+    if (!editName.trim()) {
+      Alert.alert('Falta el nombre', 'El nombre no puede estar vacío.');
+      return;
+    }
+    if (editDob && !ISO_DATE_RE.test(editDob)) {
+      Alert.alert(
+        'Fecha inválida',
+        'Usa el formato YYYY-MM-DD (ej. 1995-08-15).',
+      );
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      await apiFetch('/users/me', {
+        method: 'PATCH',
+        body: {
+          fullName: editName.trim(),
+          dateOfBirth: editDob ? editDob : null,
+        },
+      });
+      await refreshUser();
+      setEditing(false);
+    } catch (e: any) {
+      Alert.alert(
+        'No se pudo guardar',
+        e?.message ?? 'Intenta de nuevo en un momento.',
+      );
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const togglePref = async (
+    key: 'reservationReminders' | 'reservationUpdates' | 'adminAlerts',
+    next: boolean,
+  ) => {
+    // Optimistic
+    if (key === 'reservationReminders') setReservationReminders(next);
+    if (key === 'reservationUpdates') setReservationUpdates(next);
+    if (key === 'adminAlerts') setAdminAlerts(next);
+    setSavingPref(key);
+    try {
+      await apiFetch('/users/me/notification-preferences', {
+        method: 'PATCH',
+        body: { [key]: next },
+      });
+      await refreshUser();
+    } catch (e: any) {
+      // Rollback
+      if (key === 'reservationReminders') setReservationReminders(!next);
+      if (key === 'reservationUpdates') setReservationUpdates(!next);
+      if (key === 'adminAlerts') setAdminAlerts(!next);
+      Alert.alert(
+        'No se pudo actualizar',
+        e?.message ?? 'Intenta de nuevo.',
+      );
+    } finally {
+      setSavingPref(null);
+    }
+  };
 
   const onLogout = () => {
     Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
@@ -135,8 +235,10 @@ export default function UserProfileScreen() {
   }
 
   const profile = toProfile(user, activeMembership?.unitNumber);
-  const hasContacts = profile.contacts.length > 0;
-  const hasDocs = profile.documents.length > 0;
+  const dobLabel = useMemo(() => {
+    if (!user.dateOfBirth) return 'Sin registrar';
+    return user.dateOfBirth;
+  }, [user.dateOfBirth]);
 
   return (
     <View style={styles.container}>
@@ -146,109 +248,261 @@ export default function UserProfileScreen() {
       <ProfileHeader user={profile} />
 
       <View style={styles.sheetContainer}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
         >
-          <View style={[styles.card, styles.avatarCard]}>
-            <ImageUploader
-              variant="avatar"
-              kind="avatar"
-              value={user.avatar || undefined}
-              onChange={async (url) => {
-                try {
-                  await apiFetch('/users/me', {
-                    method: 'PATCH',
-                    body: { avatar: url },
-                  });
-                  await refreshUser();
-                } catch (e: any) {
-                  Alert.alert(
-                    'No se pudo guardar',
-                    e?.message ?? 'Intenta de nuevo.',
-                  );
-                }
-              }}
-            />
-            <Text style={styles.avatarCaption}>
-              {user.fullName}
-            </Text>
-            <Text style={styles.avatarCaptionSub}>{profile.email}</Text>
-          </View>
-
-          <View style={styles.card}>
-            <SectionHeader
-              title="Mis Datos"
-              icon="user"
-              action={refreshing ? 'Actualizando…' : 'Actualizar'}
-              onActionPress={() => {
-                setRefreshing(true);
-                refreshUser().finally(() => setRefreshing(false));
-              }}
-            />
-            <InfoRow icon="mail" label="Correo Electrónico" value={profile.email} />
-            <View style={styles.separator} />
-            <InfoRow
-              icon="home"
-              label="Club activo"
-              value={activeMembership?.club?.name ?? '—'}
-            />
-          </View>
-
-          <LeaseInfo lease={profile.lease} />
-
-          {hasDocs ? <DocumentsList documents={profile.documents} /> : null}
-
-          {hasContacts ? (
-            <View style={styles.card}>
-              <SectionHeader title="Emergencia" icon="shield" />
-              {profile.contacts.map((contact, index) => (
-                <View key={contact.id ?? index}>
-                  <View style={styles.contactRow}>
-                    <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarInitials}>
-                        {contact.name?.charAt(0) ?? '?'}
-                      </Text>
-                    </View>
-                    <View style={styles.contactInfo}>
-                      <Text style={styles.contactName}>{contact.name}</Text>
-                      <Text style={styles.contactRelation}>
-                        {contact.relation} • {contact.phone}
-                      </Text>
-                    </View>
-                  </View>
-                  {index < profile.contacts.length - 1 && (
-                    <View style={styles.separator} />
-                  )}
-                </View>
-              ))}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={[styles.card, styles.avatarCard]}>
+              <ImageUploader
+                variant="avatar"
+                kind="avatar"
+                value={user.avatar || undefined}
+                onChange={async (url) => {
+                  try {
+                    await apiFetch('/users/me', {
+                      method: 'PATCH',
+                      body: { avatar: url },
+                    });
+                    await refreshUser();
+                  } catch (e: any) {
+                    Alert.alert(
+                      'No se pudo guardar',
+                      e?.message ?? 'Intenta de nuevo.',
+                    );
+                  }
+                }}
+              />
+              <Text style={styles.avatarCaption}>{user.fullName}</Text>
+              <Text style={styles.avatarCaptionSub}>{profile.email}</Text>
             </View>
-          ) : null}
 
-          <View style={styles.card}>
-            <View style={styles.rowBetween}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={[styles.infoIconBox, { backgroundColor: '#f1f5f9' }]}>
-                  <Feather name="bell" size={18} color={COLORS.text.primary} />
+            {/* Mis Datos — editable */}
+            <View style={styles.card}>
+              <SectionHeader
+                title="Mis Datos"
+                icon="user"
+                action={
+                  editing
+                    ? 'Cancelar'
+                    : refreshing
+                      ? 'Actualizando…'
+                      : 'Editar'
+                }
+                onActionPress={() => {
+                  if (editing) cancelEdit();
+                  else startEdit();
+                }}
+              />
+
+              {editing ? (
+                <View style={{ gap: 12, paddingTop: 4 }}>
+                  <View>
+                    <Text style={styles.fieldLabel}>Nombre completo</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editName}
+                      onChangeText={setEditName}
+                      placeholder="Nombre completo"
+                      placeholderTextColor={COLORS.text.label}
+                      autoCapitalize="words"
+                      maxLength={120}
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.fieldLabel}>Fecha de nacimiento</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editDob}
+                      onChangeText={(v: string) => setEditDob(formatDOBInput(v))}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={COLORS.text.label}
+                      keyboardType="number-pad"
+                      maxLength={10}
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.fieldLabel}>Correo</Text>
+                    <View style={styles.readOnlyField}>
+                      <Text style={styles.readOnlyText}>{user.email}</Text>
+                      <Feather
+                        name="lock"
+                        size={13}
+                        color={COLORS.text.label}
+                      />
+                    </View>
+                    <Text style={styles.helperText}>
+                      El correo no se puede editar desde aquí.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.saveBtn,
+                      savingProfile && { opacity: 0.6 },
+                    ]}
+                    onPress={saveProfile}
+                    disabled={savingProfile}
+                    activeOpacity={0.85}
+                  >
+                    {savingProfile ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.saveBtnText}>Guardar</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.infoValue}>Notificaciones</Text>
-              </View>
-              <Switch
-                trackColor={{ false: '#cbd5e1', true: COLORS.brand.teal }}
-                thumbColor="#fff"
-                onValueChange={setNotificationsEnabled}
-                value={notificationsEnabled}
+              ) : (
+                <>
+                  <InfoRow
+                    icon="user"
+                    label="Nombre"
+                    value={user.fullName}
+                  />
+                  <View style={styles.separator} />
+                  <InfoRow
+                    icon="mail"
+                    label="Correo"
+                    value={user.email}
+                  />
+                  <View style={styles.separator} />
+                  <InfoRow
+                    icon="calendar"
+                    label="Nacimiento"
+                    value={dobLabel}
+                  />
+                  <View style={styles.separator} />
+                  <InfoRow
+                    icon="home"
+                    label="Club activo"
+                    value={activeMembership?.club?.name ?? '—'}
+                  />
+                  {activeMembership?.unitNumber ? (
+                    <>
+                      <View style={styles.separator} />
+                      <InfoRow
+                        icon="hash"
+                        label="Unidad"
+                        value={activeMembership.unitNumber}
+                      />
+                    </>
+                  ) : null}
+                </>
+              )}
+            </View>
+
+            {/* Notificaciones — conectado real */}
+            <View style={styles.card}>
+              <SectionHeader title="Notificaciones" icon="bell" />
+              <PreferenceRow
+                label="Recordatorios de reservas"
+                description="Aviso 15 min antes de tu reserva"
+                value={reservationReminders}
+                loading={savingPref === 'reservationReminders'}
+                onValueChange={(v) => togglePref('reservationReminders', v)}
+              />
+              <View style={styles.separator} />
+              <PreferenceRow
+                label="Cambios en reservas"
+                description="Cuando se confirma, modifica o cancela"
+                value={reservationUpdates}
+                loading={savingPref === 'reservationUpdates'}
+                onValueChange={(v) => togglePref('reservationUpdates', v)}
+              />
+              <View style={styles.separator} />
+              <PreferenceRow
+                label="Avisos del club"
+                description="Mensajes del administrador"
+                value={adminAlerts}
+                loading={savingPref === 'adminAlerts'}
+                onValueChange={(v) => togglePref('adminAlerts', v)}
               />
             </View>
-          </View>
 
-          <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
-            <Text style={styles.logoutText}>Cerrar Sesión</Text>
-          </TouchableOpacity>
+            {/* Próximamente — features moqueadas */}
+            <View style={[styles.card, styles.comingSoonCard]}>
+              <View style={styles.comingSoonHeader}>
+                <View style={styles.comingSoonBadge}>
+                  <Feather name="clock" size={12} color={COLORS.brand.tealDark} />
+                  <Text style={styles.comingSoonBadgeText}>Próximamente</Text>
+                </View>
+              </View>
+              <Text style={styles.comingSoonTitle}>
+                Más datos de tu residencia
+              </Text>
+              <Text style={styles.comingSoonBody}>
+                Estamos trabajando en estas funciones:
+              </Text>
+              <View style={styles.comingSoonList}>
+                <ComingSoonItem icon="dollar-sign" label="Estado de cuenta y pagos" />
+                <ComingSoonItem icon="file-text" label="Contrato de arrendamiento" />
+                <ComingSoonItem icon="folder" label="Documentos personales" />
+                <ComingSoonItem icon="phone" label="Contactos de emergencia" />
+              </View>
+            </View>
 
-          <Text style={styles.versionText}>v2.4.0 • Build 1502</Text>
-        </ScrollView>
+            <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
+              <Feather name="log-out" size={16} color="#991b1b" />
+              <Text style={styles.logoutText}>Cerrar Sesión</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.versionText}>
+              NestQuest · en desarrollo activo
+            </Text>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
+    </View>
+  );
+}
+
+function PreferenceRow({
+  label,
+  description,
+  value,
+  loading,
+  onValueChange,
+}: {
+  label: string;
+  description: string;
+  value: boolean;
+  loading: boolean;
+  onValueChange: (v: boolean) => void;
+}) {
+  return (
+    <View style={styles.prefRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.prefLabel}>{label}</Text>
+        <Text style={styles.prefDescription}>{description}</Text>
+      </View>
+      {loading ? (
+        <ActivityIndicator color={COLORS.brand.teal} />
+      ) : (
+        <Switch
+          trackColor={{ false: '#cbd5e1', true: COLORS.brand.teal }}
+          thumbColor="#fff"
+          onValueChange={onValueChange}
+          value={value}
+        />
+      )}
+    </View>
+  );
+}
+
+function ComingSoonItem({
+  icon,
+  label,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+}) {
+  return (
+    <View style={styles.comingSoonItem}>
+      <Feather name={icon} size={14} color={COLORS.text.label} />
+      <Text style={styles.comingSoonItemText}>{label}</Text>
     </View>
   );
 }
@@ -311,33 +565,141 @@ const styles = StyleSheet.create({
     marginVertical: 12,
     marginLeft: 56,
   },
-  contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e0f2fe',
+
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.text.label,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  textInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: COLORS.text.primary,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+  },
+  readOnlyField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+  },
+  readOnlyText: {
+    fontSize: 15,
+    color: COLORS.text.label,
+    fontWeight: '500',
+  },
+  helperText: {
+    fontSize: 12,
+    color: COLORS.text.label,
+    marginTop: 4,
+  },
+  saveBtn: {
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: COLORS.brand.tealDark,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginTop: 4,
   },
-  avatarInitials: { color: '#0369a1', fontWeight: '700', fontSize: 16 },
-  contactInfo: { flex: 1 },
-  contactName: { fontSize: 15, fontWeight: '600', color: COLORS.text.primary },
-  contactRelation: { fontSize: 13, color: COLORS.text.secondary },
-  rowBetween: {
+  saveBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+
+  prefRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 4,
+    gap: 16,
   },
+  prefLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+  prefDescription: {
+    fontSize: 12,
+    color: COLORS.text.label,
+    marginTop: 2,
+  },
+
+  comingSoonCard: {
+    backgroundColor: '#F8FAFC',
+  },
+  comingSoonHeader: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  comingSoonBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#ccfbf1',
+    borderWidth: 1,
+    borderColor: COLORS.brand.tealDark,
+  },
+  comingSoonBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.brand.tealDark,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  comingSoonTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginBottom: 4,
+  },
+  comingSoonBody: {
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    marginBottom: 12,
+  },
+  comingSoonList: {
+    gap: 8,
+  },
+  comingSoonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+  },
+  comingSoonItemText: {
+    fontSize: 14,
+    color: COLORS.text.primary,
+    fontWeight: '500',
+  },
+
   logoutBtn: {
     marginTop: 12,
-    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
     borderRadius: 16,
     backgroundColor: '#fee2e2',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca',
   },
-  logoutText: { color: '#991b1b', fontWeight: '600', fontSize: 15 },
+  logoutText: { color: '#991b1b', fontWeight: '700', fontSize: 14 },
   versionText: {
     textAlign: 'center',
     color: COLORS.text.label,

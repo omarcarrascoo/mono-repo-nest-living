@@ -35,6 +35,15 @@ export function ActiveClubSwitcher({ variant = 'compact' }: ActiveClubSwitcherPr
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState<string | null>(null);
 
+  // Carga memberships una vez al montar para que el pill muestre el nombre del
+  // club activo aunque el JWT viva en disk (el `hydrate()` no las llena).
+  useEffect(() => {
+    if (memberships.length === 0) {
+      void refreshMemberships();
+    }
+  }, [memberships.length, refreshMemberships]);
+
+  // Y refresca cuando el modal se abre — por si cambió algo desde otra pantalla.
   useEffect(() => {
     if (open) void refreshMemberships();
   }, [open, refreshMemberships]);
@@ -52,7 +61,13 @@ export function ActiveClubSwitcher({ variant = 'compact' }: ActiveClubSwitcherPr
     [activeMemberships, activeClubId],
   );
 
-  const label = active?.club?.name ?? 'Sin club activo';
+  // Mientras carga la lista por primera vez, no hagas claim de "sin club" —
+  // muestra "Cargando…" para evitar flicker desde el activeClubId del JWT.
+  const isLoadingFirstTime = loading && memberships.length === 0;
+  const label = isLoadingFirstTime
+    ? 'Cargando…'
+    : active?.club?.name ??
+      (activeClubId ? 'Tu club' : 'Sin club activo');
 
   // Si solo tiene un club, no mostramos switcher (no hay nada que cambiar).
   if (activeMemberships.length <= 1) {
