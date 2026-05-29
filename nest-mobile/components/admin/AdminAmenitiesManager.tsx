@@ -20,6 +20,8 @@ import { Amenity, AmenityStatus, DaySchedule, WeeklySchedule } from '@/types/api
 import { useAmenitiesStore } from '@/stores/amenities-store';
 import { useCategoriesStore } from '@/stores/categories-store';
 import { adminService } from '@/services/admin.service';
+import { ImageUploader } from '@/components/ui/ImageUploader';
+import { IconPicker } from '@/components/ui/IconPicker';
 
 interface AdminAmenitiesManagerProps {
   visible: boolean;
@@ -258,6 +260,20 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<WeeklySchedule>(defaultSchedule);
   const [scheduleMode, setScheduleMode] = useState<'uniform' | 'custom'>('uniform');
+  // Reglas de reserva
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState('60');
+  const [maxConcurrentReservations, setMaxConcurrentReservations] = useState('1');
+  const [maxPerUserPerDay, setMaxPerUserPerDay] = useState('1');
+  const [bookingLeadMinutes, setBookingLeadMinutes] = useState('60');
+  const [bookingHorizonDays, setBookingHorizonDays] = useState('14');
+  const [timezone, setTimezone] = useState('America/Mexico_City');
+  // Features (icon + label) y Rules (string list)
+  const [features, setFeatures] = useState<{ icon: string; label: string }[]>([]);
+  const [featureIconDraft, setFeatureIconDraft] = useState('');
+  const [featureLabelDraft, setFeatureLabelDraft] = useState('');
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [rules, setRules] = useState<string[]>([]);
+  const [ruleDraft, setRuleDraft] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -278,8 +294,70 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
       const initial = amenity?.schedule ?? defaultSchedule();
       setSchedule(initial);
       setScheduleMode(isUniformSchedule(initial) ? 'uniform' : 'custom');
+      setSlotDurationMinutes(
+        amenity?.slotDurationMinutes != null
+          ? String(amenity.slotDurationMinutes)
+          : '60',
+      );
+      setMaxConcurrentReservations(
+        amenity?.maxConcurrentReservations != null
+          ? String(amenity.maxConcurrentReservations)
+          : '1',
+      );
+      setMaxPerUserPerDay(
+        amenity?.maxPerUserPerDay != null
+          ? String(amenity.maxPerUserPerDay)
+          : '1',
+      );
+      setBookingLeadMinutes(
+        amenity?.bookingLeadMinutes != null
+          ? String(amenity.bookingLeadMinutes)
+          : '60',
+      );
+      setBookingHorizonDays(
+        amenity?.bookingHorizonDays != null
+          ? String(amenity.bookingHorizonDays)
+          : '14',
+      );
+      setTimezone(amenity?.timezone ?? 'America/Mexico_City');
+      setFeatures(
+        Array.isArray(amenity?.features) ? amenity!.features.map((f) => ({ ...f })) : [],
+      );
+      setFeatureIconDraft('');
+      setFeatureLabelDraft('');
+      setRules(Array.isArray(amenity?.rules) ? [...amenity!.rules] : []);
+      setRuleDraft('');
     }
   }, [visible, amenity]);
+
+  const addFeature = () => {
+    const icon = featureIconDraft.trim();
+    const label = featureLabelDraft.trim();
+    if (!icon || !label) {
+      Alert.alert('Falta info', 'Necesitas ícono y etiqueta para agregar.');
+      return;
+    }
+    setFeatures((arr) => [...arr, { icon, label }]);
+    setFeatureIconDraft('');
+    setFeatureLabelDraft('');
+  };
+
+  const removeFeature = (idx: number) =>
+    setFeatures((arr) => arr.filter((_, i) => i !== idx));
+
+  const addRule = () => {
+    const v = ruleDraft.trim();
+    if (!v) return;
+    if (v.length > 200) {
+      Alert.alert('Regla muy larga', 'Máximo 200 caracteres.');
+      return;
+    }
+    setRules((arr) => [...arr, v]);
+    setRuleDraft('');
+  };
+
+  const removeRule = (idx: number) =>
+    setRules((arr) => arr.filter((_, i) => i !== idx));
 
   const updateDay = (day: DayKey, patch: Partial<DaySchedule>) => {
     setSchedule((prev) => ({ ...prev, [day]: { ...prev[day], ...patch } }));
@@ -319,6 +397,48 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
       Alert.alert('Horario inválido', scheduleError);
       return;
     }
+    // Validar reglas numéricas
+    const slotN = Number(slotDurationMinutes);
+    if (!Number.isInteger(slotN) || slotN < 15 || slotN > 480) {
+      Alert.alert(
+        'Duración inválida',
+        'La duración del slot debe ser un entero entre 15 y 480 minutos.',
+      );
+      return;
+    }
+    const concurrentN = Number(maxConcurrentReservations);
+    if (!Number.isInteger(concurrentN) || concurrentN < 1 || concurrentN > 500) {
+      Alert.alert(
+        'Concurrencia inválida',
+        'Reservas concurrentes: entero entre 1 y 500.',
+      );
+      return;
+    }
+    const perUserN = Number(maxPerUserPerDay);
+    if (!Number.isInteger(perUserN) || perUserN < 0 || perUserN > 50) {
+      Alert.alert(
+        'Límite por usuario inválido',
+        'Reservas por usuario por día: entero entre 0 y 50 (0 = ilimitado).',
+      );
+      return;
+    }
+    const leadN = Number(bookingLeadMinutes);
+    if (!Number.isInteger(leadN) || leadN < 0) {
+      Alert.alert(
+        'Anticipación inválida',
+        'Minutos mínimos de anticipación: entero ≥ 0.',
+      );
+      return;
+    }
+    const horizonN = Number(bookingHorizonDays);
+    if (!Number.isInteger(horizonN) || horizonN < 1 || horizonN > 365) {
+      Alert.alert(
+        'Horizonte inválido',
+        'Días con anticipación: entero entre 1 y 365.',
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const payload: Partial<Amenity> = {
@@ -328,12 +448,20 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
         image: image.trim(),
         status,
         schedule,
+        slotDurationMinutes: slotN,
+        maxConcurrentReservations: concurrentN,
+        maxPerUserPerDay: perUserN,
+        bookingLeadMinutes: leadN,
+        bookingHorizonDays: horizonN,
+        timezone: timezone.trim() || 'America/Mexico_City',
       };
       if (capacity.trim()) {
         const n = Number(capacity.trim());
         if (Number.isFinite(n) && n > 0) payload.capacity = n;
       }
       if (categoryId) payload.categoryId = categoryId;
+      if (features.length > 0) payload.features = features;
+      if (rules.length > 0) payload.rules = rules;
 
       if (amenity) {
         await adminService.updateAmenity(amenity.id, payload);
@@ -400,17 +528,13 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
             />
           </FormField>
 
-          <FormField label="URL de imagen">
-            <TextInput
-              style={styles.input}
-              placeholder="https://..."
-              placeholderTextColor={COLORS.text.label}
-              value={image}
-              onChangeText={setImage}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </FormField>
+          <ImageUploader
+            label="Imagen"
+            value={image || undefined}
+            onChange={(url) => setImage(url ?? '')}
+            kind="amenity"
+            aspectRatio={16 / 9}
+          />
 
           <FormField label="Capacidad">
             <TextInput
@@ -576,6 +700,207 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
                 </Text>
               </View>
             )}
+          </FormField>
+
+          <Text style={styles.sectionHeader}>Reglas de reserva</Text>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <FormField label="Duración slot (min)">
+                <TextInput
+                  style={styles.input}
+                  placeholder="60"
+                  placeholderTextColor={COLORS.text.label}
+                  value={slotDurationMinutes}
+                  onChangeText={setSlotDurationMinutes}
+                  keyboardType="number-pad"
+                />
+              </FormField>
+            </View>
+            <View style={{ flex: 1 }}>
+              <FormField label="Reservas concurrentes">
+                <TextInput
+                  style={styles.input}
+                  placeholder="1"
+                  placeholderTextColor={COLORS.text.label}
+                  value={maxConcurrentReservations}
+                  onChangeText={setMaxConcurrentReservations}
+                  keyboardType="number-pad"
+                />
+              </FormField>
+            </View>
+          </View>
+          <Text style={styles.helperText}>
+            Reservas concurrentes = cuántas personas pueden reservar el mismo
+            slot. Sube esto si la amenidad cabe varios grupos a la vez.
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <FormField label="Máx. por usuario/día">
+                <TextInput
+                  style={styles.input}
+                  placeholder="1"
+                  placeholderTextColor={COLORS.text.label}
+                  value={maxPerUserPerDay}
+                  onChangeText={setMaxPerUserPerDay}
+                  keyboardType="number-pad"
+                />
+              </FormField>
+            </View>
+            <View style={{ flex: 1 }}>
+              <FormField label="Anticipación (min)">
+                <TextInput
+                  style={styles.input}
+                  placeholder="60"
+                  placeholderTextColor={COLORS.text.label}
+                  value={bookingLeadMinutes}
+                  onChangeText={setBookingLeadMinutes}
+                  keyboardType="number-pad"
+                />
+              </FormField>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <FormField label="Horizonte (días)">
+                <TextInput
+                  style={styles.input}
+                  placeholder="14"
+                  placeholderTextColor={COLORS.text.label}
+                  value={bookingHorizonDays}
+                  onChangeText={setBookingHorizonDays}
+                  keyboardType="number-pad"
+                />
+              </FormField>
+            </View>
+            <View style={{ flex: 1 }}>
+              <FormField label="Zona horaria">
+                <TextInput
+                  style={styles.input}
+                  placeholder="America/Mexico_City"
+                  placeholderTextColor={COLORS.text.label}
+                  value={timezone}
+                  onChangeText={setTimezone}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </FormField>
+            </View>
+          </View>
+
+          <Text style={styles.sectionHeader}>Características</Text>
+
+          <FormField label="Iconos destacados (ej. wifi, parking)">
+            {features.length > 0 ? (
+              <View style={styles.featuresList}>
+                {features.map((f, i) => (
+                  <View key={`${f.icon}-${i}`} style={styles.featurePill}>
+                    <Feather
+                      name={(f.icon as any) ?? 'star'}
+                      size={12}
+                      color={COLORS.brand.tealDark}
+                    />
+                    <Text style={styles.featurePillText}>{f.label}</Text>
+                    <TouchableOpacity onPress={() => removeFeature(i)} hitSlop={6}>
+                      <Feather name="x" size={12} color={COLORS.brand.tealDark} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            <View style={styles.featureInputRow}>
+              <TouchableOpacity
+                onPress={() => setIconPickerOpen(true)}
+                style={styles.iconPickerBtn}
+                activeOpacity={0.85}
+              >
+                {featureIconDraft ? (
+                  <Feather
+                    name={featureIconDraft as any}
+                    size={20}
+                    color={COLORS.brand.tealDark}
+                  />
+                ) : (
+                  <Feather name="image" size={20} color={COLORS.text.label} />
+                )}
+                <Text style={styles.iconPickerBtnText}>
+                  {featureIconDraft || 'Ícono'}
+                </Text>
+              </TouchableOpacity>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="etiqueta (ej. Wi-Fi)"
+                placeholderTextColor={COLORS.text.label}
+                value={featureLabelDraft}
+                onChangeText={setFeatureLabelDraft}
+                onSubmitEditing={addFeature}
+                returnKeyType="done"
+                maxLength={40}
+              />
+              <TouchableOpacity
+                style={styles.tagAddBtn}
+                onPress={addFeature}
+                disabled={!featureIconDraft.trim() || !featureLabelDraft.trim()}
+                activeOpacity={0.85}
+              >
+                <Feather name="plus" size={16} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.helperText}>
+              Toca el ícono para buscar entre Feather Icons.
+            </Text>
+
+            <IconPicker
+              visible={iconPickerOpen}
+              value={featureIconDraft}
+              onClose={() => setIconPickerOpen(false)}
+              onSelect={(name) => setFeatureIconDraft(name)}
+            />
+          </FormField>
+
+          <FormField label="Reglas de uso">
+            {rules.length > 0 ? (
+              <View style={{ gap: 6, marginBottom: 8 }}>
+                {rules.map((r, i) => (
+                  <View key={i} style={styles.ruleRow}>
+                    <View style={styles.ruleBullet}>
+                      <Text style={styles.ruleBulletText}>{i + 1}</Text>
+                    </View>
+                    <Text style={styles.ruleText}>{r}</Text>
+                    <TouchableOpacity
+                      onPress={() => removeRule(i)}
+                      hitSlop={6}
+                      style={styles.deleteRuleBtn}
+                    >
+                      <Feather name="x" size={14} color="#dc2626" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            <View style={styles.featureInputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Ej. No se permiten mascotas"
+                placeholderTextColor={COLORS.text.label}
+                value={ruleDraft}
+                onChangeText={setRuleDraft}
+                onSubmitEditing={addRule}
+                returnKeyType="done"
+                maxLength={200}
+                multiline={false}
+              />
+              <TouchableOpacity
+                style={styles.tagAddBtn}
+                onPress={addRule}
+                disabled={!ruleDraft.trim()}
+                activeOpacity={0.85}
+              >
+                <Feather name="plus" size={16} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </FormField>
 
           <FormField label="Estado">
@@ -962,6 +1287,115 @@ const styles = StyleSheet.create({
     color: COLORS.text.label,
     paddingHorizontal: 4,
     marginTop: 4,
+  },
+
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.brand.tealDark,
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginTop: 8,
+  },
+  helperText: {
+    fontSize: 11,
+    color: COLORS.text.label,
+    paddingHorizontal: 4,
+    marginTop: -6,
+  },
+
+  featuresList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  featurePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#ccfbf1',
+    borderWidth: 1,
+    borderColor: COLORS.brand.tealDark,
+  },
+  featurePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.brand.tealDark,
+  },
+  featureInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  tagAddBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: COLORS.brand.tealDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconPickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: COLORS.light.card,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    minWidth: 110,
+  },
+  iconPickerBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: COLORS.light.card,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+  },
+  ruleBullet: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.brand.tealDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  ruleBulletText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  ruleText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.text.primary,
+    lineHeight: 18,
+  },
+  deleteRuleBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   statusChip: {

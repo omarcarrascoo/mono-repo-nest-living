@@ -12,6 +12,7 @@ import { ReservationsModule } from './reservations/reservations.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { CommunityModule } from './community/community.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { CommunityModule } from './community/community.module';
     NotificationsModule,
     DeliveryModule,
     CommunityModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

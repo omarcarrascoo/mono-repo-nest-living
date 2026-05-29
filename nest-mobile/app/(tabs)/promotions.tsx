@@ -22,6 +22,7 @@ import { RegularDealCard } from '@/components/promotions/RegularDealCard';
 import { PromoCategory, PromoDeal } from '@/types/promotions';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
 import { useNotificationsStore } from '@/stores/notifications-store';
+import { useAuthStore } from '@/stores/auth-store';
 
 // --- MOCK DATA ---
 const CATEGORIES: PromoCategory[] = [
@@ -72,6 +73,7 @@ export default function PromotionsScreen() {
 
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     void fetchUnreadCount();
@@ -83,7 +85,9 @@ export default function PromotionsScreen() {
       <SafeAreaView style={{ flex: 1 }}>
 
         <DashboardHeader
-          avatarUrl="https://i.pravatar.cc/150?u=a042581f4e29026024d"
+          avatarUrl={user?.avatar}
+          fullName={user?.fullName}
+          userName={user?.fullName?.split(' ')[0] ?? 'Vecino'}
           hasUnread={unreadCount > 0}
           onMenuPress={() => router.push('/notifications' as never)}
           variant="standard"

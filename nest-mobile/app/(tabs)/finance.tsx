@@ -7,6 +7,7 @@ import { PaymentWidget } from '@/components/wallet/PaymentWidget';
 import { TransactionList } from '@/components/wallet/TransactionList';
 import { COLORS } from '@/constants/theme';
 import { useNotificationsStore } from '@/stores/notifications-store';
+import { useAuthStore } from '@/stores/auth-store';
 
 // Mock Data (Can be moved to a service later)
 const NEXT_PAYMENT = {
@@ -28,6 +29,7 @@ export default function SplitSheetWallet() {
   const router = useRouter();
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     void fetchUnreadCount();
@@ -41,7 +43,9 @@ export default function SplitSheetWallet() {
       <View style={styles.topSection}>
         <SafeAreaView>
           <DashboardHeader
-            avatarUrl="https://i.pravatar.cc/150?u=a042581f4e29026024d"
+            avatarUrl={user?.avatar}
+            fullName={user?.fullName}
+            userName={user?.fullName?.split(' ')[0] ?? 'Vecino'}
             hasUnread={unreadCount > 0}
             onMenuPress={() => router.push('/notifications' as never)}
           />

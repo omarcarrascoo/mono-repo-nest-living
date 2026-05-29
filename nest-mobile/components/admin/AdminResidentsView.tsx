@@ -16,7 +16,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Avatar } from '@/components/ui/Avatar';
 import { COLORS } from '@/constants/theme';
 import { useAdminStore } from '@/stores/admin-store';
 import { ClubMember, Role } from '@/types/api';
@@ -45,10 +45,6 @@ const ROLE_CHIPS: { value: Role; label: string }[] = [
   { value: 'admin', label: 'Admin' },
   { value: 'kitchen_operator', label: 'Cocina' },
 ];
-
-function avatarFallback(name: string) {
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0F766E&color=fff`;
-}
 
 const AnimatedFlatList = Animated.createAnimatedComponent(
   // FlatList type is fine but this avoids importing the type directly
@@ -370,9 +366,11 @@ function PendingRow({
 }) {
   return (
     <View style={styles.pendingRow}>
-      <Image
-        source={{ uri: user.avatar ?? avatarFallback(user.fullName) }}
-        style={styles.avatar}
+      <Avatar
+        uri={user.avatar}
+        name={user.fullName}
+        size={48}
+        rounded={16}
       />
       <View style={styles.rowBody}>
         <Text style={styles.rowName} numberOfLines={1}>
@@ -455,9 +453,11 @@ function ResidentRow({
   const roleColor = ROLE_COLOR[user.role];
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
-      <Image
-        source={{ uri: user.avatar ?? avatarFallback(user.fullName) }}
-        style={styles.avatar}
+      <Avatar
+        uri={user.avatar}
+        name={user.fullName}
+        size={48}
+        rounded={16}
       />
       <View style={styles.rowBody}>
         <View style={styles.rowHeader}>
@@ -595,9 +595,11 @@ function ResidentActionsSheet({
         <View style={styles.modalHandle} />
 
         <View style={styles.sheetHeader}>
-          <Image
-            source={{ uri: user.avatar ?? avatarFallback(user.fullName) }}
-            style={styles.sheetAvatar}
+          <Avatar
+            uri={user.avatar}
+            name={user.fullName}
+            size={56}
+            rounded={18}
           />
           <View style={{ flex: 1 }}>
             <Text style={styles.sheetName}>{user.fullName}</Text>

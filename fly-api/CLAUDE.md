@@ -73,7 +73,46 @@ MONGO_URI=mongodb+srv://...
 JWT_SECRET=...
 JWT_EXPIRES_IN=7d
 PORT=3000
+
+# Image uploads — provider swap via STORAGE_PROVIDER (default: supabase)
+STORAGE_PROVIDER=supabase   # o "r2" para producción
+
+# --- Supabase Storage (default, free tier) ---
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>     # del dashboard, NO el anon
+SUPABASE_BUCKET=nestquest-media
+
+# --- Cloudflare R2 (futuro, sin egress) ---
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=nestquest-media
+R2_PUBLIC_BASE_URL=https://<bucket>.<account>.r2.dev
 ```
+
+`main.ts` carga `dotenv/config` al arrancar — no hace falta `@nestjs/config`.
+
+### Storage providers
+
+El módulo `uploads/` exporta un `StorageClient` interface con dos implementaciones detrás de la env var `STORAGE_PROVIDER`:
+
+- **`supabase` (default)** — Free tier 1GB storage + 2GB egress/mes. Setup más rápido, ideal para arrancar.
+- **`r2`** — Cloudflare R2 S3-compatible. Egress GRATIS para siempre (clave a escala). Más config inicial.
+
+Para cambiar de proveedor: `STORAGE_PROVIDER=r2` + envs R2_* + reiniciar. El FE no se entera — `/uploads/sign` siempre devuelve `{ uploadUrl, publicUrl, headers }` y el `ImageUploader` aplica esos headers tal cual.
+
+### Supabase setup
+
+1. Dashboard → Storage → "New bucket" → nombre `nestquest-media` → marca **Public**.
+2. Copia `Project URL` + `service_role` key (Settings → API). El service role salta RLS, lo necesitamos porque el firmado se hace server-side.
+3. Mete `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET` en `.env` y reinicia.
+
+### Cloudflare R2 setup (cuando migres)
+
+1. Crea un bucket público en R2 (Settings → Public access → R2.dev domain o custom).
+2. CORS del bucket: permite `PUT/GET/HEAD` desde el origen del FE.
+3. API token con permisos `Object Read & Write` con scope al bucket.
+4. Mete `R2_*` en `.env`, set `STORAGE_PROVIDER=r2`, reinicia.
 
 ## Convenciones
 
@@ -93,6 +132,7 @@ PORT=3000
 | Método | Ruta | Auth | Roles | Notas |
 |---|---|---|---|---|
 | GET | `/` | público | — | hello |
+| POST | `/uploads/sign` | JWT | — | `{ kind, contentType, contentLength }` → `{ uploadUrl, publicUrl, key, headers, expiresIn }`. El FE hace `PUT uploadUrl` directo a R2 con el binario. Max 5 MB, mime ∈ jpeg/png/webp |
 | POST | `/auth/register` | público | — | `{ fullName, email, password, dateOfBirth? }` — crea user sin club ni rol |
 | POST | `/auth/login` | público | — | `{ access_token, activeClubId, activeMembershipRole }`. Si el user no tiene memberships activas, `activeClubId=null` |
 | POST | `/auth/switch-club` | JWT | — | `{ clubId }` — re-emite el JWT apuntando a ese club. 403 si no es miembro activo |

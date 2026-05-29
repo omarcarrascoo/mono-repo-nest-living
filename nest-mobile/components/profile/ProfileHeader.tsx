@@ -1,10 +1,11 @@
 // src/components/profile/ProfileHeader.tsx
 import React from 'react';
-import { View, Text, Image, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 import { UserProfile } from '@/types/user';
 import RowBackHeader from '../ui/RowBackHeader';
+import { Avatar } from '../ui/Avatar';
 interface ProfileHeaderProps {
   user: UserProfile;
 }
@@ -23,7 +24,13 @@ export default function ProfileHeader({ user }: ProfileHeaderProps) {
 
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
+            <Avatar
+              uri={user.avatar?.startsWith('http') ? user.avatar : undefined}
+              name={user.fullName}
+              size={100}
+              rounded={50}
+              ring
+            />
             <View style={styles.statusBadge}>
               <Feather name="check" size={12} color="#FFF" />
             </View>

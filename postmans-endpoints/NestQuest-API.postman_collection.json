@@ -281,6 +281,50 @@
 			]
 		},
 		{
+			"name": "Uploads",
+			"description": "Uploads de imágenes vía URL firmada (S3-compatible / Cloudflare R2).\n\nFlujo: 1) FE pide /uploads/sign con `kind` + `contentType` + `contentLength`. 2) BE devuelve `{uploadUrl, publicUrl, key, headers, expiresIn}`. 3) FE hace `PUT uploadUrl` directo al provider con el binario y los `headers`. 4) FE guarda `publicUrl` en el campo destino (avatar, amenity.image, product.image).",
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{accessToken}}",
+						"type": "string"
+					}
+				]
+			},
+			"item": [
+				{
+					"name": "POST /uploads/sign",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"kind\": \"amenity\",\n  \"contentType\": \"image/jpeg\",\n  \"contentLength\": 524288\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/uploads/sign",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"uploads",
+								"sign"
+							]
+						},
+						"description": "Firma una URL de upload directa al provider configurado en `STORAGE_PROVIDER` (supabase | r2). Body:\n- `kind`: 'amenity' | 'product' | 'avatar' | 'post'\n- `contentType`: 'image/jpeg' | 'image/png' | 'image/webp'\n- `contentLength`: bytes del archivo (≤ 5 MB)\n\nResponse: `{ uploadUrl, publicUrl, key, method: 'PUT', headers: object, expiresIn }`. El FE aplica `headers` tal cual al PUT — Supabase mete `x-upsert: true`, R2 solo `Content-Type`. Avatares se guardan en `users/{userId}/avatar/{ulid}.{ext}`; el resto en `clubs/{clubId}/{kind}/{ulid}.{ext}`."
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "Users",
 			"description": "Endpoints de usuario. Requieren JWT Bearer.",
 			"auth": {
@@ -2629,5 +2673,5 @@
 			]
 		}
 	],
-	"description": ""
+	"description": "\n\n## Variables de entorno (BE — uploads)\nDefault: Supabase Storage (free tier). Para cambiar a R2 set `STORAGE_PROVIDER=r2`.\n**Supabase:**\n- `SUPABASE_URL` — project URL\n- `SUPABASE_SERVICE_ROLE_KEY` — service role key (no anon)\n- `SUPABASE_BUCKET` — bucket público\n**R2 (futuro):**\n- `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL`"
 }

@@ -5,12 +5,13 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
+import { Avatar } from '@/components/ui/Avatar';
 
 interface PostComposerTriggerProps {
   avatarUrl?: string;
+  fullName?: string | null;
   isAdmin: boolean;
   onPress: () => void;
 }
@@ -21,6 +22,7 @@ interface PostComposerTriggerProps {
  */
 export const PostComposerTrigger: React.FC<PostComposerTriggerProps> = ({
   avatarUrl,
+  fullName,
   isAdmin,
   onPress,
 }) => {
@@ -30,13 +32,7 @@ export const PostComposerTrigger: React.FC<PostComposerTriggerProps> = ({
       onPress={onPress}
       activeOpacity={0.85}
     >
-      {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatar, styles.avatarFallback]}>
-          <Feather name="user" size={18} color={COLORS.text.label} />
-        </View>
-      )}
+      <Avatar uri={avatarUrl} name={fullName} size={40} />
       <View style={styles.bubble}>
         <Text style={styles.placeholder}>
           {isAdmin

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
+import { Avatar } from '@/components/ui/Avatar';
 import { COLORS } from '@/constants/theme';
 import { useAdminStore } from '@/stores/admin-store';
 import { AdminReservation } from '@/types/api';
@@ -201,13 +202,11 @@ function AdminReservationRow({
     <View style={styles.row}>
       <View style={styles.rowHeader}>
         <View style={styles.rowAuthor}>
-          <Image
-            source={{
-              uri:
-                reservation.user?.avatar ??
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(reservation.user?.fullName ?? '?')}&background=0F766E&color=fff`,
-            }}
-            style={styles.rowAvatar}
+          <Avatar
+            uri={reservation.user?.avatar}
+            name={reservation.user?.fullName}
+            size={38}
+            rounded={12}
           />
           <View>
             <Text style={styles.rowName} numberOfLines={1}>

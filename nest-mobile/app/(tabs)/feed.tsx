@@ -141,7 +141,9 @@ export default function FeedUnifiedScreen() {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={{ flex: 1 }}>
         <DashboardHeader
-          avatarUrl={user?.avatar ?? ''}
+          avatarUrl={user?.avatar}
+          fullName={user?.fullName}
+          userName={user?.fullName?.split(' ')[0] ?? 'Vecino'}
           hasUnread={unreadCount > 0}
           onMenuPress={() => router.push('/notifications' as never)}
           variant="standard"
@@ -220,6 +222,7 @@ export default function FeedUnifiedScreen() {
 
           <PostComposerTrigger
             avatarUrl={user?.avatar}
+            fullName={user?.fullName}
             isAdmin={isAdmin}
             onPress={handleNewPost}
           />

@@ -16,9 +16,16 @@ import {
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
-import { Product, ProductCategory, ProductStatus } from '@/types/api';
+import {
+  Product,
+  ProductCategory,
+  ProductOption,
+  ProductOptionGroup,
+  ProductStatus,
+} from '@/types/api';
 import { useDeliveryStore } from '@/stores/delivery-store';
 import { adminService } from '@/services/admin.service';
+import { ImageUploader } from '@/components/ui/ImageUploader';
 
 interface AdminProductsManagerProps {
   visible: boolean;
@@ -214,6 +221,15 @@ function slugify(s: string): string {
     .slice(0, 60);
 }
 
+function genId(prefix: string) {
+  // ID estable suficiente para identificar option groups/options en el cliente.
+  // No usamos Date.now() para evitar restricciones del sandbox; encadenamos
+  // contadores monotónicos con un salt aleatorio simple.
+  idSeq += 1;
+  return `${prefix}-${idSeq}`;
+}
+let idSeq = 0;
+
 function ProductForm({
   visible,
   product,
@@ -226,10 +242,14 @@ function ProductForm({
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
   const [price, setPrice] = useState('');
+  const [originalPrice, setOriginalPrice] = useState('');
   const [status, setStatus] = useState<ProductStatus>('available');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [featured, setFeatured] = useState(false);
   const [prepTime, setPrepTime] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState('');
+  const [optionGroups, setOptionGroups] = useState<ProductOptionGroup[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Crear categoría inline
@@ -243,14 +263,144 @@ function ProductForm({
       setDescription(product?.description ?? '');
       setImage(product?.image ?? '');
       setPrice(product?.price != null ? String(product.price) : '');
+      setOriginalPrice(
+        product?.originalPrice != null ? String(product.originalPrice) : '',
+      );
       setStatus(product?.status ?? 'available');
       setCategoryId(product?.categoryId ?? null);
       setFeatured(!!product?.featured);
       setPrepTime(product?.prepTime ?? '');
+      setTags(Array.isArray(product?.tags) ? [...product!.tags!] : []);
+      setTagDraft('');
+      setOptionGroups(
+        Array.isArray(product?.optionGroups)
+          ? product!.optionGroups.map((g) => ({
+              ...g,
+              options: g.options.map((o) => ({ ...o })),
+            }))
+          : [],
+      );
       setCreatingCategory(false);
       setNewCategoryName('');
     }
   }, [visible, product]);
+
+  const addTag = () => {
+    const v = tagDraft.trim();
+    if (!v) return;
+    if (v.length > 30) {
+      Alert.alert('Tag muy largo', 'Máximo 30 caracteres por tag.');
+      return;
+    }
+    if (tags.includes(v)) {
+      setTagDraft('');
+      return;
+    }
+    setTags((t) => [...t, v]);
+    setTagDraft('');
+  };
+
+  const removeTag = (t: string) => setTags((arr) => arr.filter((x) => x !== t));
+
+  const addOptionGroup = () => {
+    setOptionGroups((groups) => [
+      ...groups,
+      {
+        id: genId('grp'),
+        name: '',
+        mode: 'single',
+        required: false,
+        options: [
+          { id: genId('opt'), name: '', priceDelta: 0, available: true },
+        ],
+      },
+    ]);
+  };
+
+  const updateGroup = (
+    idx: number,
+    patch: Partial<ProductOptionGroup>,
+  ) => {
+    setOptionGroups((groups) =>
+      groups.map((g, i) => (i === idx ? { ...g, ...patch } : g)),
+    );
+  };
+
+  const removeGroup = (idx: number) => {
+    setOptionGroups((groups) => groups.filter((_, i) => i !== idx));
+  };
+
+  const addOption = (groupIdx: number) => {
+    setOptionGroups((groups) =>
+      groups.map((g, i) =>
+        i === groupIdx
+          ? {
+              ...g,
+              options: [
+                ...g.options,
+                {
+                  id: genId('opt'),
+                  name: '',
+                  priceDelta: 0,
+                  available: true,
+                },
+              ],
+            }
+          : g,
+      ),
+    );
+  };
+
+  const updateOption = (
+    groupIdx: number,
+    optIdx: number,
+    patch: Partial<ProductOption>,
+  ) => {
+    setOptionGroups((groups) =>
+      groups.map((g, i) =>
+        i === groupIdx
+          ? {
+              ...g,
+              options: g.options.map((o, oi) =>
+                oi === optIdx ? { ...o, ...patch } : o,
+              ),
+            }
+          : g,
+      ),
+    );
+  };
+
+  const removeOption = (groupIdx: number, optIdx: number) => {
+    setOptionGroups((groups) =>
+      groups.map((g, i) =>
+        i === groupIdx
+          ? { ...g, options: g.options.filter((_, oi) => oi !== optIdx) }
+          : g,
+      ),
+    );
+  };
+
+  const validateOptionGroups = (): string | null => {
+    for (let gi = 0; gi < optionGroups.length; gi++) {
+      const g = optionGroups[gi];
+      if (!g.name.trim()) {
+        return `El grupo #${gi + 1} no tiene nombre.`;
+      }
+      if (g.options.length === 0) {
+        return `El grupo "${g.name}" debe tener al menos una opción.`;
+      }
+      for (let oi = 0; oi < g.options.length; oi++) {
+        const o = g.options[oi];
+        if (!o.name.trim()) {
+          return `Una opción del grupo "${g.name}" no tiene nombre.`;
+        }
+        if (!Number.isFinite(o.priceDelta ?? 0)) {
+          return `El precio extra de "${o.name}" no es válido.`;
+        }
+      }
+    }
+    return null;
+  };
 
   const handleCreateCategory = async () => {
     const trimmed = newCategoryName.trim();
@@ -307,8 +457,32 @@ function ProductForm({
       Alert.alert('Precio inválido', 'Captura un precio válido en MXN.');
       return;
     }
+    let originalPriceNum: number | undefined;
+    if (originalPrice.trim()) {
+      const parsed = Number(originalPrice);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        Alert.alert(
+          'Precio anterior inválido',
+          'Si capturas un precio anterior debe ser un número ≥ 0.',
+        );
+        return;
+      }
+      if (parsed <= priceNum) {
+        Alert.alert(
+          'Precio anterior',
+          'El precio anterior debe ser mayor al precio actual para mostrar la oferta.',
+        );
+        return;
+      }
+      originalPriceNum = parsed;
+    }
     if (!categoryId) {
       Alert.alert('Falta categoría', 'Selecciona una categoría para el producto.');
+      return;
+    }
+    const groupErr = validateOptionGroups();
+    if (groupErr) {
+      Alert.alert('Revisa las opciones', groupErr);
       return;
     }
     setSaving(true);
@@ -323,6 +497,25 @@ function ProductForm({
         featured,
       };
       if (prepTime.trim()) payload.prepTime = prepTime.trim();
+      if (originalPriceNum !== undefined) {
+        payload.originalPrice = originalPriceNum;
+      }
+      if (tags.length > 0) payload.tags = tags;
+      // Siempre mandamos optionGroups (incluyendo array vacío) si los editamos.
+      payload.optionGroups = optionGroups.map((g) => ({
+        id: g.id,
+        name: g.name.trim(),
+        mode: g.mode,
+        required: !!g.required,
+        ...(g.maxSelections ? { maxSelections: g.maxSelections } : {}),
+        options: g.options.map((o) => ({
+          id: o.id,
+          name: o.name.trim(),
+          priceDelta: Number(o.priceDelta ?? 0),
+          available: o.available !== false,
+          ...(o.default ? { default: true } : {}),
+        })),
+      }));
 
       if (product) {
         await adminService.updateProduct(product.id, payload);
@@ -379,21 +572,17 @@ function ProductForm({
             />
           </FormField>
 
-          <FormField label="URL de imagen">
-            <TextInput
-              style={styles.input}
-              placeholder="https://..."
-              placeholderTextColor={COLORS.text.label}
-              value={image}
-              onChangeText={setImage}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </FormField>
+          <ImageUploader
+            label="Imagen"
+            value={image || undefined}
+            onChange={(url) => setImage(url ?? '')}
+            kind="product"
+            aspectRatio={4 / 3}
+          />
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
-              <FormField label="Precio (MXN)">
+              <FormField label="Precio (MXN) *">
                 <TextInput
                   style={styles.input}
                   placeholder="0"
@@ -405,17 +594,67 @@ function ProductForm({
               </FormField>
             </View>
             <View style={{ flex: 1 }}>
-              <FormField label="Tiempo prep">
+              <FormField label="Antes (oferta)">
                 <TextInput
                   style={styles.input}
-                  placeholder="20-30 min"
+                  placeholder="opcional"
                   placeholderTextColor={COLORS.text.label}
-                  value={prepTime}
-                  onChangeText={setPrepTime}
+                  value={originalPrice}
+                  onChangeText={setOriginalPrice}
+                  keyboardType="decimal-pad"
                 />
               </FormField>
             </View>
           </View>
+
+          <FormField label="Tiempo de preparación">
+            <TextInput
+              style={styles.input}
+              placeholder="Ej. 20-30 min"
+              placeholderTextColor={COLORS.text.label}
+              value={prepTime}
+              onChangeText={setPrepTime}
+            />
+          </FormField>
+
+          <FormField label="Tags">
+            <View style={styles.tagsRow}>
+              {tags.map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={styles.tagChip}
+                  onPress={() => removeTag(t)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.tagChipText}>{t}</Text>
+                  <Feather name="x" size={12} color={COLORS.brand.tealDark} />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.tagInputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Ej. picante, vegano, sin gluten"
+                placeholderTextColor={COLORS.text.label}
+                value={tagDraft}
+                onChangeText={setTagDraft}
+                onSubmitEditing={addTag}
+                returnKeyType="done"
+                maxLength={30}
+              />
+              <TouchableOpacity
+                style={styles.tagAddBtn}
+                onPress={addTag}
+                disabled={!tagDraft.trim()}
+                activeOpacity={0.85}
+              >
+                <Feather name="plus" size={16} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.helperText}>
+              Toca un tag para borrarlo. Aparecen en la card del producto.
+            </Text>
+          </FormField>
 
           <FormField label="Estado">
             <View style={styles.statusRow}>
@@ -524,6 +763,202 @@ function ProductForm({
                 Aún no tienes categorías. Toca “Nueva” para crear la primera.
               </Text>
             ) : null}
+          </FormField>
+
+          <FormField label="Opciones del producto">
+            <Text style={styles.helperText}>
+              Crea grupos de opciones (ej. tamaño, salsa, extras). En cada grupo
+              defines si el residente elige uno o varios.
+            </Text>
+
+            {optionGroups.map((g, gi) => (
+              <View key={g.id} style={styles.groupBox}>
+                <View style={styles.groupHeader}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    placeholder="Nombre del grupo (ej. Tamaño)"
+                    placeholderTextColor={COLORS.text.label}
+                    value={g.name}
+                    onChangeText={(v: string) => updateGroup(gi, { name: v })}
+                    maxLength={80}
+                  />
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => removeGroup(gi)}
+                    hitSlop={6}
+                    activeOpacity={0.85}
+                  >
+                    <Feather name="trash-2" size={16} color="#dc2626" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.groupModeRow}>
+                  <TouchableOpacity
+                    onPress={() => updateGroup(gi, { mode: 'single' })}
+                    style={[
+                      styles.modeChip,
+                      g.mode === 'single' && styles.modeChipActive,
+                    ]}
+                  >
+                    <Feather
+                      name="circle"
+                      size={12}
+                      color={g.mode === 'single' ? '#fff' : COLORS.text.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.modeChipText,
+                        g.mode === 'single' && styles.modeChipTextActive,
+                      ]}
+                    >
+                      Elige uno
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => updateGroup(gi, { mode: 'multiple' })}
+                    style={[
+                      styles.modeChip,
+                      g.mode === 'multiple' && styles.modeChipActive,
+                    ]}
+                  >
+                    <Feather
+                      name="check-square"
+                      size={12}
+                      color={
+                        g.mode === 'multiple' ? '#fff' : COLORS.text.primary
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.modeChipText,
+                        g.mode === 'multiple' && styles.modeChipTextActive,
+                      ]}
+                    >
+                      Varios
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => updateGroup(gi, { required: !g.required })}
+                    style={[
+                      styles.modeChip,
+                      g.required && styles.modeChipActiveAlt,
+                    ]}
+                  >
+                    <Feather
+                      name={g.required ? 'check-circle' : 'circle'}
+                      size={12}
+                      color={g.required ? '#fff' : COLORS.text.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.modeChipText,
+                        g.required && styles.modeChipTextActive,
+                      ]}
+                    >
+                      Obligatorio
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {g.mode === 'multiple' ? (
+                  <View style={styles.maxSelRow}>
+                    <Text style={styles.maxSelLabel}>Máx. selecciones:</Text>
+                    <TextInput
+                      style={styles.maxSelInput}
+                      keyboardType="number-pad"
+                      placeholder="∞"
+                      placeholderTextColor={COLORS.text.label}
+                      value={
+                        g.maxSelections != null ? String(g.maxSelections) : ''
+                      }
+                      onChangeText={(v: string) => {
+                        const n = Number(v);
+                        updateGroup(gi, {
+                          maxSelections:
+                            v.trim() && Number.isFinite(n) && n > 0
+                              ? n
+                              : undefined,
+                        });
+                      }}
+                    />
+                  </View>
+                ) : null}
+
+                {g.options.map((o, oi) => (
+                  <View key={o.id} style={styles.optionRow}>
+                    <TouchableOpacity
+                      onPress={() =>
+                        updateOption(gi, oi, { available: !o.available })
+                      }
+                      style={[
+                        styles.availDot,
+                        !o.available && styles.availDotOff,
+                      ]}
+                      hitSlop={6}
+                    >
+                      <Feather
+                        name={o.available ? 'check' : 'x'}
+                        size={11}
+                        color="#fff"
+                      />
+                    </TouchableOpacity>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      placeholder="Nombre de la opción"
+                      placeholderTextColor={COLORS.text.label}
+                      value={o.name}
+                      onChangeText={(v: string) => updateOption(gi, oi, { name: v })}
+                      maxLength={60}
+                    />
+                    <TextInput
+                      style={[styles.input, styles.priceDeltaInput]}
+                      placeholder="+0"
+                      placeholderTextColor={COLORS.text.label}
+                      value={
+                        o.priceDelta != null && o.priceDelta !== 0
+                          ? String(o.priceDelta)
+                          : ''
+                      }
+                      onChangeText={(v: string) =>
+                        updateOption(gi, oi, {
+                          priceDelta: v.trim() ? Number(v) : 0,
+                        })
+                      }
+                      keyboardType="numbers-and-punctuation"
+                    />
+                    <TouchableOpacity
+                      onPress={() => removeOption(gi, oi)}
+                      hitSlop={6}
+                      style={styles.deleteOptBtn}
+                    >
+                      <Feather name="x" size={14} color="#dc2626" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  style={styles.addOptionBtn}
+                  onPress={() => addOption(gi)}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="plus" size={14} color={COLORS.brand.tealDark} />
+                  <Text style={styles.addOptionBtnText}>Agregar opción</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            <TouchableOpacity
+              style={styles.addGroupBtn}
+              onPress={addOptionGroup}
+              activeOpacity={0.85}
+            >
+              <Feather name="plus-circle" size={16} color="#fff" />
+              <Text style={styles.addGroupBtnText}>
+                {optionGroups.length === 0
+                  ? 'Agregar grupo de opciones'
+                  : 'Agregar otro grupo'}
+              </Text>
+            </TouchableOpacity>
           </FormField>
 
           <TouchableOpacity
@@ -790,6 +1225,189 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.text.label,
     paddingHorizontal: 4,
+  },
+
+  helperText: {
+    fontSize: 12,
+    color: COLORS.text.label,
+    paddingHorizontal: 4,
+    marginBottom: 8,
+  },
+
+  tagsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+    marginBottom: 8,
+  },
+  tagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#ccfbf1',
+    borderWidth: 1,
+    borderColor: COLORS.brand.tealDark,
+  },
+  tagChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.brand.tealDark,
+  },
+  tagInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  tagAddBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: COLORS.brand.tealDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  groupBox: {
+    backgroundColor: COLORS.light.card,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    gap: 10,
+    marginBottom: 10,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  deleteBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupModeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  modeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+  },
+  modeChipActive: {
+    backgroundColor: COLORS.brand.tealDark,
+    borderColor: COLORS.brand.tealDark,
+  },
+  modeChipActiveAlt: {
+    backgroundColor: '#0369a1',
+    borderColor: '#0369a1',
+  },
+  modeChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+  modeChipTextActive: { color: '#fff' },
+
+  maxSelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  maxSelLabel: {
+    fontSize: 12,
+    color: COLORS.text.label,
+    fontWeight: '600',
+  },
+  maxSelInput: {
+    width: 60,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: COLORS.text.primary,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    textAlign: 'center',
+  },
+
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  availDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#16a34a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  availDotOff: {
+    backgroundColor: '#94a3b8',
+  },
+  priceDeltaInput: {
+    width: 70,
+    textAlign: 'center',
+  },
+  deleteOptBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#ccfbf1',
+    borderWidth: 1,
+    borderColor: COLORS.brand.tealDark,
+    borderStyle: 'dashed',
+  },
+  addOptionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.brand.tealDark,
+  },
+  addGroupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.brand.tealDark,
+  },
+  addGroupBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   featuredToggle: {

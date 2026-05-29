@@ -90,7 +90,8 @@ export default function DeliveryScreen() {
         <StatusBar barStyle="dark-content" backgroundColor={COLORS.ui.white} />
         <SafeAreaView style={{ flex: 1 }}>
           <DashboardHeader
-            avatarUrl={user?.avatar ?? 'https://i.pravatar.cc/150?u=a042581f4e29026024d'}
+            avatarUrl={user?.avatar}
+            fullName={user?.fullName}
             userName={user?.fullName?.split(' ')[0] ?? 'Admin'}
             location="Cocina y pedidos"
             hasUnread={unreadCount > 0}
@@ -115,7 +116,9 @@ export default function DeliveryScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.ui.white} />
       <SafeAreaView style={{ flex: 1 }}>
         <DashboardHeader
-          avatarUrl="https://i.pravatar.cc/150?u=a042581f4e29026024d"
+          avatarUrl={user?.avatar}
+          fullName={user?.fullName}
+          userName={user?.fullName?.split(' ')[0] ?? 'Vecino'}
           hasUnread={unreadCount > 0}
           onMenuPress={() => router.push('/notifications' as never)}
           variant="standard"

@@ -132,10 +132,8 @@ export default function UnifiedAmenitiesScreen() {
         <View style={styles.topSection}>
           <SafeAreaView>
             <DashboardHeader
-              avatarUrl={
-                user?.avatar ??
-                'https://i.pravatar.cc/150?u=a042581f4e29026024d'
-              }
+              avatarUrl={user?.avatar}
+              fullName={user?.fullName}
               userName={user?.fullName?.split(' ')[0] ?? 'Admin'}
               location="Panel de administración"
               hasUnread={unreadCount > 0}
@@ -177,10 +175,8 @@ export default function UnifiedAmenitiesScreen() {
       <View style={styles.topSection}>
         <SafeAreaView>
           <DashboardHeader
-            avatarUrl={
-              user?.avatar ??
-              'https://i.pravatar.cc/150?u=a042581f4e29026024d'
-            }
+            avatarUrl={user?.avatar}
+            fullName={user?.fullName}
             userName={user?.fullName?.split(' ')[0] ?? 'Vecino'}
             hasUnread={unreadCount > 0}
             onMenuPress={() => router.push('/notifications' as never)}

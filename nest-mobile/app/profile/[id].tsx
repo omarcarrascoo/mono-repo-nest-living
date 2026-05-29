@@ -25,8 +25,10 @@ import ProfileHeader from '@/components/profile/ProfileHeader';
 import SectionHeader from '@/components/ui/FormHeader';
 import LeaseInfo from '@/components/profile/LeaseInfo';
 import DocumentsList from '@/components/profile/DocumentList';
+import { ImageUploader } from '@/components/ui/ImageUploader';
 import { useAuthStore } from '@/stores/auth-store';
 import { AuthUser } from '@/types/api';
+import { apiFetch } from '@/lib/api/client';
 
 const EMPTY_STATS: ResidentStats = {
   balanceOwed: 0,
@@ -52,9 +54,8 @@ function toProfile(u: AuthUser, unitNumber?: string): UserProfile {
     status: (u.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE') as
       | 'ACTIVE'
       | 'INACTIVE',
-    avatar:
-      u.avatar ??
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName)}&background=0F766E&color=fff`,
+    // Si no hay avatar real, lo dejamos vacío y el `<Avatar>` dibuja iniciales.
+    avatar: u.avatar ?? '',
     // Stats / lease / contacts / documents ya no viven en User — son datos
     // que un día el club tendrá scope-ado por Membership. Por ahora mostramos
     // valores vacíos para no romper la UI.
@@ -149,6 +150,32 @@ export default function UserProfileScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          <View style={[styles.card, styles.avatarCard]}>
+            <ImageUploader
+              variant="avatar"
+              kind="avatar"
+              value={user.avatar || undefined}
+              onChange={async (url) => {
+                try {
+                  await apiFetch('/users/me', {
+                    method: 'PATCH',
+                    body: { avatar: url },
+                  });
+                  await refreshUser();
+                } catch (e: any) {
+                  Alert.alert(
+                    'No se pudo guardar',
+                    e?.message ?? 'Intenta de nuevo.',
+                  );
+                }
+              }}
+            />
+            <Text style={styles.avatarCaption}>
+              {user.fullName}
+            </Text>
+            <Text style={styles.avatarCaptionSub}>{profile.email}</Text>
+          </View>
+
           <View style={styles.card}>
             <SectionHeader
               title="Mis Datos"
@@ -238,6 +265,20 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   scrollContent: { padding: 24, paddingBottom: 60 },
+  avatarCard: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  avatarCaption: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+    marginTop: 8,
+  },
+  avatarCaptionSub: {
+    fontSize: 13,
+    color: COLORS.text.label,
+  },
   card: {
     backgroundColor: COLORS.light.card,
     borderRadius: 20,

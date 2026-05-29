@@ -1,15 +1,18 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
-import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { COLORS, THEME } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { ActiveClubSwitcher } from './ActiveClubSwitcher';
+import { Avatar } from './Avatar';
 
 type HeaderVariant = 'minimal' | 'standard';
 
 interface DashboardHeaderProps {
-  avatarUrl: string;
+  /** URL del avatar. Si está vacía o undefined, se usa el fallback con iniciales. */
+  avatarUrl?: string | null;
+  /** Para generar las iniciales si no hay foto. */
+  fullName?: string | null;
   variant?: HeaderVariant;
   userName?: string;
   location?: string;
@@ -29,15 +32,16 @@ const SIZES = {
   locationSize: 12,
 };
 
-export const DashboardHeader = ({ 
-  avatarUrl, 
+export const DashboardHeader = ({
+  avatarUrl,
+  fullName,
   variant = 'minimal',
   userName = "Vecino",
   location = "Torre B",
-  hasUnread = false, 
-  onMenuPress, 
+  hasUnread = false,
+  onMenuPress,
   onAvatarPress,
-  style 
+  style
 }: DashboardHeaderProps) => {
   const router = useRouter();
 
@@ -46,23 +50,29 @@ export const DashboardHeader = ({
   };
 
   const isStandard = variant === 'standard';
+  // Si no hay fullName explícito, derivamos del greeting para tener iniciales
+  // razonables (mejor que '?' en pantallas que solo pasan userName).
+  const seedName = fullName ?? userName ?? 'Vecino';
 
   return (
     <View style={[
-      isStandard ? styles.containerStandard : styles.containerMinimal, 
+      isStandard ? styles.containerStandard : styles.containerMinimal,
       style
     ]}>
       <View style={styles.leftSection}>
-        <TouchableOpacity 
-          style={isStandard ? styles.avatarWrapperStandard : styles.avatarWrapperMinimal} 
+        <TouchableOpacity
+          style={isStandard ? styles.avatarWrapperStandard : styles.avatarWrapperMinimal}
           onPress={handleAvatarPress}
+          activeOpacity={0.85}
         >
-           <Image 
-             source={{ uri: avatarUrl }} 
-             style={isStandard ? styles.avatarStandard : styles.avatarMinimal} 
-           />
-           {/* Badge visible en ambos para consistencia */}
-           <View style={styles.onlineBadge} />
+          <Avatar
+            uri={avatarUrl ?? undefined}
+            name={seedName}
+            size={SIZES.avatar}
+            rounded={SIZES.borderRadius}
+            ring={!isStandard}
+          />
+          <View style={styles.onlineBadge} />
         </TouchableOpacity>
 
         <View style={styles.textContainer}>
