@@ -12,6 +12,7 @@ import {
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ActiveClubGuard } from '../auth/guards/active-club.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
@@ -22,7 +23,7 @@ import {
 } from './dto/product.dto';
 
 @Controller('delivery/products')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ActiveClubGuard, RolesGuard)
 export class ProductsController {
   constructor(private readonly service: ProductsService) {}
 
@@ -32,7 +33,7 @@ export class ProductsController {
     @Query() query: ListProductsQueryDto,
   ) {
     return this.service.list({
-      residencyId: user.residencyId,
+      clubId: user.activeClubId!,
       q: query.q,
       categoryId: query.category,
       status: query.status,
@@ -43,7 +44,7 @@ export class ProductsController {
 
   @Get('featured')
   featured(@CurrentUser() user: CurrentUserPayload) {
-    return this.service.featuredOfDay(user.residencyId);
+    return this.service.featuredOfDay(user.activeClubId!);
   }
 
   @Get(':id')
@@ -51,7 +52,7 @@ export class ProductsController {
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.service.findOne(id, user.residencyId);
+    return this.service.findOne(id, user.activeClubId!);
   }
 
   @Post()
@@ -60,7 +61,7 @@ export class ProductsController {
     @Body() dto: CreateProductDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.service.create(user.residencyId, dto);
+    return this.service.create(user.activeClubId!, dto);
   }
 
   @Put(':id')
@@ -70,7 +71,7 @@ export class ProductsController {
     @Body() dto: UpdateProductDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.service.update(id, user.residencyId, dto);
+    return this.service.update(id, user.activeClubId!, dto);
   }
 
   @Delete(':id')
@@ -79,6 +80,6 @@ export class ProductsController {
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.service.remove(id, user.residencyId);
+    return this.service.remove(id, user.activeClubId!);
   }
 }

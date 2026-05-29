@@ -1,31 +1,32 @@
-import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
+/**
+ * Si la ruta requiere rol 'super_admin', se valida contra `user.globalRole`.
+ * Si requiere 'admin' / 'kitchen_operator' / 'user' se valida contra
+ * `user.activeMembershipRole` (rol dentro del club activo). Un super admin
+ * pasa cualquier check (override).
+ */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
-  
-
   canActivate(context: ExecutionContext): boolean {
-    console.log('RolesGuard initialized');
-    Logger.debug('RolesGuard initialized');
-    // 1. Get the roles required by the handler (e.g., ['admin'])
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
-    
-    // 2. If no roles are required, allow access
-    if (!requiredRoles) {
-      return true;
-    }
+    if (!requiredRoles || requiredRoles.length === 0) return true;
 
-    // 3. Get the user object attached by the JwtAuthGuard
     const { user } = context.switchToHttp().getRequest();
+    if (!user) return false;
 
-    // 4. Check if the user has the required role
-    return requiredRoles.some((role) => user.role?.includes(role));
+    if (user.globalRole === 'super_admin') return true;
+
+    return requiredRoles.some((required) => {
+      if (required === 'super_admin') return user.globalRole === 'super_admin';
+      return user.activeMembershipRole === required;
+    });
   }
 }

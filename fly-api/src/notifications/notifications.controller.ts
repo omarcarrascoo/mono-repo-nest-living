@@ -20,6 +20,7 @@ import {
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ActiveClubGuard } from '../auth/guards/active-club.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
@@ -123,11 +124,12 @@ export class NotificationsController {
   }
 
   @Post('broadcast')
+  @UseGuards(ActiveClubGuard)
   @Roles('admin')
   async broadcast(
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: BroadcastNotificationDto,
   ) {
-    return this.notifications.broadcast(user.residencyId, user.userId, dto);
+    return this.notifications.broadcast(user.activeClubId!, user.userId, dto);
   }
 }

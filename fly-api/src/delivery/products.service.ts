@@ -9,7 +9,7 @@ import { Product } from './schemas/product.schema';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
 
 export interface ListProductsOptions {
-  residencyId: string;
+  clubId: string;
   q?: string;
   categoryId?: string;
   status?: string;
@@ -23,7 +23,7 @@ export class ProductsService {
   ) {}
 
   async list(opts: ListProductsOptions) {
-    const filter: Record<string, any> = { residencyId: opts.residencyId };
+    const filter: Record<string, any> = { clubId: opts.clubId };
 
     // Default: hide products marked hidden unless explicitly requested.
     if (opts.status) {
@@ -58,12 +58,12 @@ export class ProductsService {
       .exec();
   }
 
-  async findOne(id: string, residencyId: string) {
+  async findOne(id: string, clubId: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Product not found');
     }
     const product = await this.productModel
-      .findOne({ _id: id, residencyId })
+      .findOne({ _id: id, clubId })
       .lean()
       .exec();
     if (!product) throw new NotFoundException('Product not found');
@@ -74,41 +74,41 @@ export class ProductsService {
    * Looks up the loaded model docs (not lean) so the order service can read
    * authoritative price + option data.
    */
-  async findManyByIds(ids: string[], residencyId: string) {
+  async findManyByIds(ids: string[], clubId: string) {
     if (ids.length === 0) return [];
     const validIds = ids
       .filter((id) => Types.ObjectId.isValid(id))
       .map((id) => new Types.ObjectId(id));
     return this.productModel
-      .find({ _id: { $in: validIds }, residencyId })
+      .find({ _id: { $in: validIds }, clubId })
       .lean()
       .exec();
   }
 
-  async featuredOfDay(residencyId: string) {
+  async featuredOfDay(clubId: string) {
     // Strategy: prefer an explicitly-flagged `featured: true` available product.
     // Fall back to highest-rated available product.
     const flagged = await this.productModel
-      .findOne({ residencyId, featured: true, status: 'available' })
+      .findOne({ clubId, featured: true, status: 'available' })
       .sort({ updatedAt: -1 })
       .lean()
       .exec();
     if (flagged) return flagged;
 
     return this.productModel
-      .findOne({ residencyId, status: 'available' })
+      .findOne({ clubId, status: 'available' })
       .sort({ rating: -1, reviewCount: -1 })
       .lean()
       .exec();
   }
 
-  async create(residencyId: string, dto: CreateProductDto) {
-    return this.productModel.create({ ...dto, residencyId });
+  async create(clubId: string, dto: CreateProductDto) {
+    return this.productModel.create({ ...dto, clubId });
   }
 
-  async update(id: string, residencyId: string, dto: UpdateProductDto) {
+  async update(id: string, clubId: string, dto: UpdateProductDto) {
     const updated = await this.productModel.findOneAndUpdate(
-      { _id: id, residencyId },
+      { _id: id, clubId },
       dto,
       { new: true },
     );
@@ -118,8 +118,8 @@ export class ProductsService {
     return updated;
   }
 
-  async remove(id: string, residencyId: string) {
-    const result = await this.productModel.deleteOne({ _id: id, residencyId });
+  async remove(id: string, clubId: string) {
+    const result = await this.productModel.deleteOne({ _id: id, clubId });
     if (result.deletedCount === 0) {
       throw new ForbiddenException(
         'Cannot delete product from another residency',

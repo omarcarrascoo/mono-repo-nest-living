@@ -1,16 +1,19 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from './schemas/user.schema';
+import { Membership } from '../clubs/schemas/membership.schema';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Membership.name) private membershipModel: Model<Membership>,
+  ) {}
 
   async create(createDto: any): Promise<User> {
     const newUser = new this.userModel(createDto);
@@ -27,66 +30,157 @@ export class UsersService {
     return user ?? undefined;
   }
 
-  async findAdminsByResidency(residencyId: string): Promise<User[]> {
+  async isUserActiveInClub(userId: string, clubId: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(userId) || !Types.ObjectId.isValid(clubId)) {
+      return false;
+    }
+    const m = await this.membershipModel
+      .findOne({
+        userId: new Types.ObjectId(userId),
+        clubId: new Types.ObjectId(clubId),
+        status: 'active',
+      })
+      .select('_id')
+      .lean()
+      .exec();
+    return !!m;
+  }
+
+  // ---- Reads scoped to a club via Membership ----
+
+  /**
+   * Lista admins activos del club. Usado por notificaciones internas.
+   */
+  async findAdminsByClub(clubId: string): Promise<User[]> {
+    const memberships = await this.membershipModel
+      .find({
+        clubId: new Types.ObjectId(clubId),
+        role: 'admin',
+        status: 'active',
+      })
+      .select('userId')
+      .lean()
+      .exec();
+    if (memberships.length === 0) return [];
+    const ids = memberships.map((m) => m.userId);
     return this.userModel
-      .find({ residencyId, role: 'admin' })
+      .find({ _id: { $in: ids } })
       .select('_id email fullName')
       .lean()
       .exec() as unknown as User[];
   }
 
-  async findStaffByResidency(residencyId: string): Promise<User[]> {
+  async findStaffByClub(clubId: string): Promise<User[]> {
+    const memberships = await this.membershipModel
+      .find({
+        clubId: new Types.ObjectId(clubId),
+        role: { $in: ['admin', 'kitchen_operator'] },
+        status: 'active',
+      })
+      .select('userId role')
+      .lean()
+      .exec();
+    if (memberships.length === 0) return [];
+    const ids = memberships.map((m) => m.userId);
+    const users = (await this.userModel
+      .find({ _id: { $in: ids } })
+      .select('_id email fullName')
+      .lean()
+      .exec()) as any[];
+    const roleByUser = new Map(
+      memberships.map((m) => [String(m.userId), m.role]),
+    );
+    return users.map((u) => ({
+      ...u,
+      role: roleByUser.get(String(u._id)) ?? 'user',
+    })) as unknown as User[];
+  }
+
+  async findAllByClub(clubId: string): Promise<User[]> {
+    const memberships = await this.membershipModel
+      .find({ clubId: new Types.ObjectId(clubId), status: 'active' })
+      .select('userId')
+      .lean()
+      .exec();
+    if (memberships.length === 0) return [];
     return this.userModel
-      .find({ residencyId, role: { $in: ['admin', 'kitchen_operator'] } })
-      .select('_id email fullName role')
+      .find({ _id: { $in: memberships.map((m) => m.userId) } })
+      .select('_id email fullName avatar')
       .lean()
       .exec() as unknown as User[];
   }
 
-  async findAllByResidency(residencyId: string): Promise<User[]> {
-    return this.userModel
-      .find({ residencyId })
-      .select('_id email fullName role avatar')
-      .lean()
-      .exec() as unknown as User[];
-  }
-
-  async findByResidencyAndUnitPrefix(
-    residencyId: string,
+  async findByClubAndUnitPrefix(
+    clubId: string,
     unitPrefix: string,
   ): Promise<User[]> {
     const safe = unitPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return this.userModel
+    const memberships = await this.membershipModel
       .find({
-        residencyId,
+        clubId: new Types.ObjectId(clubId),
+        status: 'active',
         unitNumber: { $regex: `^${safe}`, $options: 'i' },
       })
-      .select('_id email fullName role avatar unitNumber')
+      .select('userId unitNumber')
       .lean()
-      .exec() as unknown as User[];
+      .exec();
+    if (memberships.length === 0) return [];
+    const users = (await this.userModel
+      .find({ _id: { $in: memberships.map((m) => m.userId) } })
+      .select('_id email fullName avatar')
+      .lean()
+      .exec()) as any[];
+    const unitByUser = new Map(
+      memberships.map((m) => [String(m.userId), m.unitNumber]),
+    );
+    return users.map((u) => ({
+      ...u,
+      unitNumber: unitByUser.get(String(u._id)) ?? '',
+    })) as unknown as User[];
   }
 
-  async listForResidencyDirectory(
-    residencyId: string,
-    q?: string,
-  ): Promise<User[]> {
-    const filter: Record<string, any> = { residencyId };
-    if (q && q.trim()) {
-      const safe = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.$or = [
-        { fullName: { $regex: safe, $options: 'i' } },
-        { email: { $regex: safe, $options: 'i' } },
-        { unitNumber: { $regex: safe, $options: 'i' } },
-      ];
-    }
-    return this.userModel
-      .find(filter)
-      .select('_id email fullName role avatar unitNumber')
-      .sort({ fullName: 1 })
-      .limit(100)
+  /**
+   * Directorio del club activo: lista todos los miembros activos enriquecidos
+   * con su rol y unidad dentro del club.
+   */
+  async listForClubDirectory(clubId: string, q?: string) {
+    const memberships = await this.membershipModel
+      .find({ clubId: new Types.ObjectId(clubId), status: 'active' })
+      .populate('userId', '_id email fullName avatar')
+      .sort({ createdAt: -1 })
+      .limit(200)
       .lean()
-      .exec() as unknown as User[];
+      .exec();
+
+    let mapped = memberships
+      .map((m: any) => {
+        if (!m.userId) return null;
+        return {
+          membershipId: String(m._id),
+          id: String(m.userId._id ?? m.userId),
+          email: m.userId.email,
+          fullName: m.userId.fullName,
+          avatar: m.userId.avatar ?? null,
+          role: m.role,
+          unitNumber: m.unitNumber ?? null,
+          status: m.status,
+        };
+      })
+      .filter(Boolean) as Array<any>;
+
+    if (q && q.trim()) {
+      const safe = q.trim().toLowerCase();
+      mapped = mapped.filter((u) =>
+        [u.fullName, u.email, u.unitNumber]
+          .filter(Boolean)
+          .some((s: string) => String(s).toLowerCase().includes(safe)),
+      );
+    }
+    mapped.sort((a, b) => String(a.fullName).localeCompare(String(b.fullName)));
+    return mapped;
   }
+
+  // ---- Per-user CRUD ----
 
   async getFavoriteIds(userId: string): Promise<string[]> {
     const user = await this.userModel
@@ -94,7 +188,7 @@ export class UsersService {
       .select('favoriteAmenityIds')
       .lean()
       .exec();
-    return (user?.favoriteAmenityIds ?? []).map((id) => String(id));
+    return ((user as any)?.favoriteAmenityIds ?? []).map((id: any) => String(id));
   }
 
   async addFavorite(userId: string, amenityId: string) {
@@ -117,7 +211,10 @@ export class UsersService {
     return { favoriteAmenityIds: updated.favoriteAmenityIds.map(String) };
   }
 
-  async updateNotificationPreferences(userId: string, prefs: Record<string, boolean>) {
+  async updateNotificationPreferences(
+    userId: string,
+    prefs: Record<string, boolean>,
+  ) {
     const $set: Record<string, boolean> = {};
     for (const k of Object.keys(prefs)) {
       $set[`notificationPreferences.${k}`] = prefs[k];
@@ -129,55 +226,25 @@ export class UsersService {
     return updated;
   }
 
-  async updateAsAdmin(
-    residencyId: string,
-    targetUserId: string,
+  async updateOwnProfile(
+    userId: string,
     dto: {
       fullName?: string;
-      role?: 'admin' | 'user' | 'kitchen_operator';
-      unitNumber?: string | null;
       avatar?: string | null;
-      status?: string;
+      dateOfBirth?: string | null;
     },
   ): Promise<User> {
-    if (!Types.ObjectId.isValid(targetUserId)) {
+    if (!Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('Invalid user id');
     }
-    const user = await this.userModel.findOne({
-      _id: targetUserId,
-      residencyId,
-    });
+    const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
-
     if (dto.fullName !== undefined) user.fullName = dto.fullName;
-    if (dto.role !== undefined) user.role = dto.role;
-    if (dto.unitNumber !== undefined) user.unitNumber = dto.unitNumber ?? '';
     if (dto.avatar !== undefined) user.avatar = dto.avatar ?? '';
-    if (dto.status !== undefined) user.status = dto.status;
-
+    if (dto.dateOfBirth !== undefined) user.dateOfBirth = dto.dateOfBirth ?? '';
     await user.save();
     const sanitized = user.toObject();
     delete (sanitized as any).password;
     return sanitized as User;
-  }
-
-  async removeAsAdmin(
-    residencyId: string,
-    actorUserId: string,
-    targetUserId: string,
-  ): Promise<{ ok: true }> {
-    if (!Types.ObjectId.isValid(targetUserId)) {
-      throw new BadRequestException('Invalid user id');
-    }
-    if (String(actorUserId) === String(targetUserId)) {
-      throw new ForbiddenException('Cannot delete yourself');
-    }
-    const user = await this.userModel.findOne({
-      _id: targetUserId,
-      residencyId,
-    });
-    if (!user) throw new NotFoundException('User not found');
-    await user.deleteOne();
-    return { ok: true };
   }
 }

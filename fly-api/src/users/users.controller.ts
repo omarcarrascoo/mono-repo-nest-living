@@ -1,10 +1,8 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   NotFoundException,
-  Param,
   Patch,
   Query,
   UseGuards,
@@ -13,11 +11,12 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { ActiveClubGuard } from '../auth/guards/active-club.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import {
   IsBoolean,
-  IsIn,
+  IsISO8601,
   IsOptional,
   IsString,
   Length,
@@ -37,16 +36,8 @@ class DirectoryQueryDto {
   q?: string;
 }
 
-class AdminUpdateUserDto {
+class UpdateOwnProfileDto {
   @IsOptional() @IsString() @Length(1, 120) fullName?: string;
-  @IsOptional() @IsIn(['admin', 'user', 'kitchen_operator'])
-  role?: 'admin' | 'user' | 'kitchen_operator';
-
-  @IsOptional()
-  @ValidateIf((_, v) => v !== null)
-  @IsString()
-  @Length(0, 40)
-  unitNumber?: string | null;
 
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
@@ -54,7 +45,10 @@ class AdminUpdateUserDto {
   @Length(0, 500)
   avatar?: string | null;
 
-  @IsOptional() @IsString() @Length(1, 40) status?: string;
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsISO8601()
+  dateOfBirth?: string | null;
 }
 
 @Controller('users')
@@ -69,6 +63,14 @@ export class UsersController {
     return u;
   }
 
+  @Patch('me')
+  async updateOwnProfile(
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() dto: UpdateOwnProfileDto,
+  ) {
+    return this.usersService.updateOwnProfile(user.userId, dto);
+  }
+
   @Get('me/favorites')
   async myFavorites(@CurrentUser() user: CurrentUserPayload) {
     const ids = await this.usersService.getFavoriteIds(user.userId);
@@ -80,37 +82,22 @@ export class UsersController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: UpdatePreferencesDto,
   ) {
-    return this.usersService.updateNotificationPreferences(user.userId, dto as any);
+    return this.usersService.updateNotificationPreferences(
+      user.userId,
+      dto as any,
+    );
   }
 
   @Get('directory')
+  @UseGuards(ActiveClubGuard)
   @Roles('admin')
   async directory(
     @CurrentUser() user: CurrentUserPayload,
     @Query() query: DirectoryQueryDto,
   ) {
-    return this.usersService.listForResidencyDirectory(
-      user.residencyId,
+    return this.usersService.listForClubDirectory(
+      user.activeClubId as string,
       query.q,
     );
-  }
-
-  @Patch(':id')
-  @Roles('admin')
-  async adminUpdate(
-    @CurrentUser() user: CurrentUserPayload,
-    @Param('id') id: string,
-    @Body() dto: AdminUpdateUserDto,
-  ) {
-    return this.usersService.updateAsAdmin(user.residencyId, id, dto);
-  }
-
-  @Delete(':id')
-  @Roles('admin')
-  async adminDelete(
-    @CurrentUser() user: CurrentUserPayload,
-    @Param('id') id: string,
-  ) {
-    return this.usersService.removeAsAdmin(user.residencyId, user.userId, id);
   }
 }

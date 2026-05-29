@@ -19,7 +19,7 @@ Cada app tiene su propio `CLAUDE.md` con reglas específicas:
 
 - El frontend resuelve `API_URL` en `nest-mobile/lib/env.ts` y apunta por default a `http://localhost:3000` en dev.
 - Auth: el backend devuelve `{ access_token }` en `POST /auth/login`. El frontend lo guarda con `expo-secure-store` (nativo) / `localStorage` (web) y lo manda en cada request vía `apiFetch` (`nest-mobile/lib/api/client.ts`).
-- Multitenancy por `residencyId`: el backend lo lee del JWT y filtra todos los recursos. El frontend nunca lo manda en el body — solo lo lee de `/users/me` para mostrarlo.
+- Multitenancy por **club**: cada user puede pertenecer a varios clubs (Membership join table), pero el JWT trae **un solo** `activeClubId` por sesión. El backend lo lee del JWT y filtra todos los recursos. El frontend nunca lo manda en el body. Para cambiar de club activo, el frontend llama `POST /auth/switch-club` que re-emite el JWT.
 - Errores 401 disparan `logout()` automático en el cliente vía un callback registrado en `auth-store`.
 
 ## Flujo de cambios end-to-end

@@ -82,7 +82,7 @@ class OrderStatusEvent {
 @Schema({ timestamps: true })
 export class Order extends Document {
   @Prop({ required: true, index: true })
-  residencyId: string;
+  clubId: string;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
@@ -122,5 +122,5 @@ export class Order extends Document {
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
 
-OrderSchema.index({ residencyId: 1, status: 1, createdAt: -1 });
+OrderSchema.index({ clubId: 1, status: 1, createdAt: -1 });
 OrderSchema.index({ userId: 1, createdAt: -1 });

@@ -6,20 +6,20 @@
 import { FeaturedProduct, Product, ProductCategory } from '@/types/api';
 
 export const MOCK_CATEGORIES: ProductCategory[] = [
-  { id: 'cat-burgers', residencyId: 'mock', name: 'Hamburguesas', slug: 'burgers', icon: 'box', sortOrder: 1, active: true, productCount: 4 },
-  { id: 'cat-tacos', residencyId: 'mock', name: 'Tacos', slug: 'tacos', icon: 'circle', sortOrder: 2, active: true, productCount: 3 },
-  { id: 'cat-pizza', residencyId: 'mock', name: 'Pizza', slug: 'pizza', icon: 'pie-chart', sortOrder: 3, active: true, productCount: 2 },
-  { id: 'cat-sushi', residencyId: 'mock', name: 'Sushi', slug: 'sushi', icon: 'feather', sortOrder: 4, active: true, productCount: 2 },
-  { id: 'cat-bowls', residencyId: 'mock', name: 'Bowls', slug: 'bowls', icon: 'inbox', sortOrder: 5, active: true, productCount: 2 },
-  { id: 'cat-drinks', residencyId: 'mock', name: 'Bebidas', slug: 'drinks', icon: 'coffee', sortOrder: 6, active: true, productCount: 3 },
-  { id: 'cat-desserts', residencyId: 'mock', name: 'Postres', slug: 'desserts', icon: 'heart', sortOrder: 7, active: true, productCount: 2 },
+  { id: 'cat-burgers', clubId: 'mock', name: 'Hamburguesas', slug: 'burgers', icon: 'box', sortOrder: 1, active: true, productCount: 4 },
+  { id: 'cat-tacos', clubId: 'mock', name: 'Tacos', slug: 'tacos', icon: 'circle', sortOrder: 2, active: true, productCount: 3 },
+  { id: 'cat-pizza', clubId: 'mock', name: 'Pizza', slug: 'pizza', icon: 'pie-chart', sortOrder: 3, active: true, productCount: 2 },
+  { id: 'cat-sushi', clubId: 'mock', name: 'Sushi', slug: 'sushi', icon: 'feather', sortOrder: 4, active: true, productCount: 2 },
+  { id: 'cat-bowls', clubId: 'mock', name: 'Bowls', slug: 'bowls', icon: 'inbox', sortOrder: 5, active: true, productCount: 2 },
+  { id: 'cat-drinks', clubId: 'mock', name: 'Bebidas', slug: 'drinks', icon: 'coffee', sortOrder: 6, active: true, productCount: 3 },
+  { id: 'cat-desserts', clubId: 'mock', name: 'Postres', slug: 'desserts', icon: 'heart', sortOrder: 7, active: true, productCount: 2 },
 ];
 
 export const MOCK_PRODUCTS: Product[] = [
   // ---- Hamburguesas ----
   {
     id: 'p-burger-classic',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-burgers',
     name: 'Classic Smash Burger',
     description: 'Doble carne de res 100 g, queso americano, cebolla caramelizada, pepinillos y salsa de la casa en pan brioche.',
@@ -86,7 +86,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-burger-mushroom',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-burgers',
     name: 'Truffle Mushroom Burger',
     description: 'Hamburguesa de res con champiñones salteados al ajo, queso suizo y aceite de trufa.',
@@ -100,7 +100,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-burger-veggie',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-burgers',
     name: 'Veggie Beet Burger',
     description: 'Hamburguesa de betabel y quinoa con queso de cabra y aioli de chipotle.',
@@ -115,7 +115,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-burger-chicken',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-burgers',
     name: 'Crispy Chicken Burger',
     description: 'Pechuga de pollo crujiente, lechuga romana y mayonesa de chipotle.',
@@ -131,7 +131,7 @@ export const MOCK_PRODUCTS: Product[] = [
   // ---- Tacos ----
   {
     id: 'p-tacos-pastor',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-tacos',
     name: 'Tacos al Pastor',
     description: 'Orden de 4 tacos al pastor con piña, cilantro y cebolla.',
@@ -169,7 +169,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-tacos-suadero',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-tacos',
     name: 'Tacos de Suadero',
     description: 'Orden de 4 tacos de suadero con cebolla y cilantro.',
@@ -183,7 +183,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-tacos-camaron',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-tacos',
     name: 'Tacos de Camarón',
     description: '3 tacos de camarón a la diabla con col morada y mayonesa cilantro-limón.',
@@ -199,7 +199,7 @@ export const MOCK_PRODUCTS: Product[] = [
   // ---- Pizza ----
   {
     id: 'p-pizza-margherita',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-pizza',
     name: 'Pizza Margherita',
     description: 'Salsa de tomate San Marzano, mozzarella fior di latte y albahaca fresca.',
@@ -225,7 +225,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-pizza-pepperoni',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-pizza',
     name: 'Pizza Pepperoni',
     description: 'Pepperoni curado en casa, mozzarella y orégano.',
@@ -241,7 +241,7 @@ export const MOCK_PRODUCTS: Product[] = [
   // ---- Sushi ----
   {
     id: 'p-sushi-roll',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-sushi',
     name: 'Roll Spicy Tuna',
     description: 'Atún picante, pepino, aguacate y cebollín con sésamo.',
@@ -255,7 +255,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-sushi-salmon',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-sushi',
     name: 'Salmón Nigiri (8 pzs)',
     description: 'Ocho piezas de nigiri de salmón fresco sobre arroz sazonado.',
@@ -271,7 +271,7 @@ export const MOCK_PRODUCTS: Product[] = [
   // ---- Bowls ----
   {
     id: 'p-bowl-poke',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-bowls',
     name: 'Poke Bowl Atún',
     description: 'Atún rojo, arroz de sushi, edamame, mango, aguacate y aderezo ponzu.',
@@ -286,7 +286,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-bowl-buddha',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-bowls',
     name: 'Buddha Bowl',
     description: 'Quinoa, garbanzos rostizados, kale, betabel, aguacate y aderezo tahini.',
@@ -303,7 +303,7 @@ export const MOCK_PRODUCTS: Product[] = [
   // ---- Bebidas ----
   {
     id: 'p-drink-lemonade',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-drinks',
     name: 'Limonada de la casa',
     description: 'Limonada fresca con menta y un toque de jengibre.',
@@ -315,7 +315,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-drink-iced-latte',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-drinks',
     name: 'Iced Latte',
     description: 'Espresso doble sobre hielo con leche entera o vegetal.',
@@ -327,7 +327,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-drink-kombucha',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-drinks',
     name: 'Kombucha de jamaica',
     description: 'Kombucha artesanal con jamaica y jengibre.',
@@ -341,7 +341,7 @@ export const MOCK_PRODUCTS: Product[] = [
   // ---- Postres ----
   {
     id: 'p-dessert-brownie',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-desserts',
     name: 'Brownie con helado',
     description: 'Brownie de chocolate con bola de helado de vainilla y caramelo salado.',
@@ -355,7 +355,7 @@ export const MOCK_PRODUCTS: Product[] = [
   },
   {
     id: 'p-dessert-cheesecake',
-    residencyId: 'mock',
+    clubId: 'mock',
     categoryId: 'cat-desserts',
     name: 'Cheesecake de fresa',
     description: 'Cheesecake estilo NY con coulis de fresa fresca.',

@@ -20,9 +20,9 @@ export class ProductCategoriesService {
     @InjectModel(Product.name) private productModel: Model<Product>,
   ) {}
 
-  async listForResidency(residencyId: string, includeCounts = true) {
+  async listForClub(clubId: string, includeCounts = true) {
     const categories = await this.categoryModel
-      .find({ residencyId, active: true })
+      .find({ clubId, active: true })
       .sort({ sortOrder: 1, name: 1 })
       .lean()
       .exec();
@@ -30,7 +30,7 @@ export class ProductCategoriesService {
     if (!includeCounts) return categories;
 
     const counts = await this.productModel.aggregate([
-      { $match: { residencyId, status: { $ne: 'hidden' } } },
+      { $match: { clubId, status: { $ne: 'hidden' } } },
       { $group: { _id: { $toString: '$categoryId' }, count: { $sum: 1 } } },
     ]);
     const countById = new Map<string, number>(
@@ -43,24 +43,24 @@ export class ProductCategoriesService {
     }));
   }
 
-  async create(residencyId: string, dto: CreateProductCategoryDto) {
+  async create(clubId: string, dto: CreateProductCategoryDto) {
     const exists = await this.categoryModel.findOne({
-      residencyId,
+      clubId,
       slug: dto.slug,
     });
     if (exists) {
       throw new ConflictException('Slug already exists in this residency');
     }
-    return this.categoryModel.create({ ...dto, residencyId });
+    return this.categoryModel.create({ ...dto, clubId });
   }
 
   async update(
     id: string,
-    residencyId: string,
+    clubId: string,
     dto: UpdateProductCategoryDto,
   ) {
     const updated = await this.categoryModel.findOneAndUpdate(
-      { _id: id, residencyId },
+      { _id: id, clubId },
       dto,
       { new: true },
     );
@@ -68,10 +68,10 @@ export class ProductCategoriesService {
     return updated;
   }
 
-  async remove(id: string, residencyId: string) {
+  async remove(id: string, clubId: string) {
     const used = await this.productModel.countDocuments({
       categoryId: id,
-      residencyId,
+      clubId,
     });
     if (used > 0) {
       throw new ConflictException(
@@ -80,7 +80,7 @@ export class ProductCategoriesService {
     }
     const result = await this.categoryModel.deleteOne({
       _id: id,
-      residencyId,
+      clubId,
     });
     if (result.deletedCount === 0) {
       throw new NotFoundException('Product category not found');

@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { RepliesService } from './replies.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ActiveClubGuard } from '../auth/guards/active-club.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
 import {
@@ -19,7 +20,7 @@ import {
 } from './dto/post.dto';
 
 @Controller('community/posts/:postId/replies')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ActiveClubGuard)
 export class RepliesController {
   constructor(private readonly service: RepliesService) {}
 

@@ -4,6 +4,7 @@ import {
   LoginRequest,
   LoginResponse,
   RegisterRequest,
+  SwitchClubRequest,
 } from '@/types/api';
 import { adaptAuthUser } from './adapters';
 
@@ -19,10 +20,17 @@ export const authService = {
   async register(payload: RegisterRequest) {
     const raw = await apiFetch<any>('/auth/register', {
       method: 'POST',
-      body: { role: 'user', ...payload },
+      body: payload,
       auth: false,
     });
     return adaptAuthUser(raw);
+  },
+
+  switchClub(payload: SwitchClubRequest) {
+    return apiFetch<LoginResponse>('/auth/switch-club', {
+      method: 'POST',
+      body: payload,
+    });
   },
 
   async me(): Promise<AuthUser> {

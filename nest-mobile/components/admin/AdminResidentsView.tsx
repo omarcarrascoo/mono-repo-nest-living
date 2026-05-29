@@ -19,7 +19,7 @@ import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { COLORS } from '@/constants/theme';
 import { useAdminStore } from '@/stores/admin-store';
-import { DirectoryUser, Role } from '@/types/api';
+import { ClubMember, Role } from '@/types/api';
 
 interface AdminResidentsViewProps {
   /** Render at the top inside the sheet, above the search bar. */
@@ -55,28 +55,41 @@ const AnimatedFlatList = Animated.createAnimatedComponent(
   require('react-native').FlatList,
 );
 
+type Tab = 'directory' | 'pending';
+
 export function AdminResidentsView({ header, scrollY }: AdminResidentsViewProps) {
   const directory = useAdminStore((s) => s.directory);
   const loading = useAdminStore((s) => s.directoryLoading);
   const error = useAdminStore((s) => s.directoryError);
   const fetchDirectory = useAdminStore((s) => s.fetchDirectory);
 
+  const pendingMembers = useAdminStore((s) => s.pendingMembers);
+  const pendingLoading = useAdminStore((s) => s.pendingLoading);
+  const pendingError = useAdminStore((s) => s.pendingError);
+  const pendingActionInFlight = useAdminStore((s) => s.pendingActionInFlight);
+  const fetchPendingMembers = useAdminStore((s) => s.fetchPendingMembers);
+  const approvePendingMember = useAdminStore((s) => s.approvePendingMember);
+  const rejectPendingMember = useAdminStore((s) => s.rejectPendingMember);
+
+  const [tab, setTab] = useState<Tab>('directory');
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<DirectoryUser | null>(null);
+  const [selected, setSelected] = useState<ClubMember | null>(null);
 
   const fallbackScrollY = useRef(new Animated.Value(0)).current;
   const scroll = scrollY ?? fallbackScrollY;
 
   useEffect(() => {
     void fetchDirectory();
-  }, [fetchDirectory]);
+    void fetchPendingMembers();
+  }, [fetchDirectory, fetchPendingMembers]);
 
   useEffect(() => {
+    if (tab !== 'directory') return;
     const handle = setTimeout(() => {
       void fetchDirectory(search.trim() || undefined);
     }, 300);
     return () => clearTimeout(handle);
-  }, [search, fetchDirectory]);
+  }, [search, fetchDirectory, tab]);
 
   const stats = useMemo(() => {
     const total = directory.length;
@@ -90,62 +103,205 @@ export function AdminResidentsView({ header, scrollY }: AdminResidentsViewProps)
     };
   }, [directory]);
 
+  const handleApprove = (m: ClubMember) => {
+    Alert.alert(
+      'Aceptar al club',
+      `¿Aceptar a ${m.fullName} en el club?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Aceptar',
+          onPress: async () => {
+            try {
+              await approvePendingMember(m.membershipId);
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'No se pudo aceptar.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleReject = (m: ClubMember) => {
+    Alert.alert(
+      'Rechazar solicitud',
+      `Esto rechaza la solicitud de ${m.fullName}. Podrá volver a pedir acceso después.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Rechazar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await rejectPendingMember(m.membershipId);
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'No se pudo rechazar.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const renderHeader = () => (
+    <View>
+      {header}
+      <View style={styles.statsRow}>
+        <StatCard
+          label="Residentes"
+          value={String(stats.residents)}
+          icon="users"
+          tint="#0f766e"
+          bg="#ccfbf1"
+        />
+        <StatCard
+          label="Admins"
+          value={String(stats.admins)}
+          icon="shield"
+          tint="#92400e"
+          bg="#fef3c7"
+        />
+        <StatCard
+          label="Pendientes"
+          value={String(pendingMembers.length)}
+          icon="user-plus"
+          tint="#c2410c"
+          bg="#ffedd5"
+        />
+      </View>
+
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === 'directory' && styles.tabBtnActive]}
+          onPress={() => setTab('directory')}
+          activeOpacity={0.85}
+        >
+          <Text
+            style={[styles.tabText, tab === 'directory' && styles.tabTextActive]}
+          >
+            Directorio
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, tab === 'pending' && styles.tabBtnActive]}
+          onPress={() => setTab('pending')}
+          activeOpacity={0.85}
+        >
+          <Text
+            style={[styles.tabText, tab === 'pending' && styles.tabTextActive]}
+          >
+            Solicitudes
+          </Text>
+          {pendingMembers.length > 0 ? (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{pendingMembers.length}</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
+      </View>
+
+      {tab === 'directory' ? (
+        <>
+          <View style={styles.searchWrap}>
+            <Feather name="search" size={18} color={COLORS.text.label} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por nombre, email o unidad"
+              placeholderTextColor={COLORS.text.label}
+              value={search}
+              onChangeText={setSearch}
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {search ? (
+              <TouchableOpacity onPress={() => setSearch('')}>
+                <Feather name="x" size={18} color={COLORS.text.label} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <Text style={styles.listTitle}>
+            Directorio · {directory.length}{' '}
+            {directory.length === 1 ? 'persona' : 'personas'}
+          </Text>
+        </>
+      ) : (
+        <Text style={styles.listTitle}>
+          Solicitudes pendientes · {pendingMembers.length}
+        </Text>
+      )}
+    </View>
+  );
+
+  if (tab === 'pending') {
+    return (
+      <View style={styles.container}>
+        <AnimatedFlatList
+          data={pendingMembers}
+          keyExtractor={(u: ClubMember) => u.membershipId}
+          ListHeaderComponent={renderHeader()}
+          renderItem={({ item }: { item: ClubMember }) => (
+            <PendingRow
+              user={item}
+              busy={!!pendingActionInFlight[item.membershipId]}
+              onApprove={() => handleApprove(item)}
+              onReject={() => handleReject(item)}
+            />
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          contentContainerStyle={styles.listContent}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scroll } } }],
+            { useNativeDriver: false },
+          )}
+          scrollEventThrottle={16}
+          refreshControl={
+            <RefreshControl
+              refreshing={pendingLoading && pendingMembers.length > 0}
+              onRefresh={() => fetchPendingMembers()}
+              tintColor={COLORS.brand.teal}
+            />
+          }
+          ListEmptyComponent={
+            pendingLoading ? (
+              <View style={styles.statePad}>
+                <ActivityIndicator color={COLORS.brand.teal} />
+              </View>
+            ) : pendingError ? (
+              <View style={styles.statePad}>
+                <Text style={styles.stateTitle}>
+                  No pudimos cargar las solicitudes
+                </Text>
+                <Text style={styles.stateBody}>{pendingError}</Text>
+                <TouchableOpacity
+                  style={styles.retryBtn}
+                  onPress={() => fetchPendingMembers()}
+                >
+                  <Text style={styles.retryBtnText}>Reintentar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.statePad}>
+                <Text style={styles.stateTitle}>Sin solicitudes pendientes</Text>
+                <Text style={styles.stateBody}>
+                  Cuando alguien pida unirse aparecerá aquí.
+                </Text>
+              </View>
+            )
+          }
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <AnimatedFlatList
         data={directory}
-        keyExtractor={(u: DirectoryUser) => u.id}
-        ListHeaderComponent={
-          <View>
-            {header}
-            <View style={styles.statsRow}>
-              <StatCard
-                label="Residentes"
-                value={String(stats.residents)}
-                icon="users"
-                tint="#0f766e"
-                bg="#ccfbf1"
-              />
-              <StatCard
-                label="Admins"
-                value={String(stats.admins)}
-                icon="shield"
-                tint="#92400e"
-                bg="#fef3c7"
-              />
-              <StatCard
-                label="Cocina"
-                value={String(stats.kitchen)}
-                icon="coffee"
-                tint="#4338ca"
-                bg="#e0e7ff"
-              />
-            </View>
-
-            <View style={styles.searchWrap}>
-              <Feather name="search" size={18} color={COLORS.text.label} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Buscar por nombre, email o unidad"
-                placeholderTextColor={COLORS.text.label}
-                value={search}
-                onChangeText={setSearch}
-                autoCorrect={false}
-                autoCapitalize="none"
-              />
-              {search ? (
-                <TouchableOpacity onPress={() => setSearch('')}>
-                  <Feather name="x" size={18} color={COLORS.text.label} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-
-            <Text style={styles.listTitle}>
-              Directorio · {directory.length} {directory.length === 1 ? 'persona' : 'personas'}
-            </Text>
-          </View>
-        }
-        renderItem={({ item }: { item: DirectoryUser }) => (
+        keyExtractor={(u: ClubMember) => u.id}
+        ListHeaderComponent={renderHeader()}
+        renderItem={({ item }: { item: ClubMember }) => (
           <ResidentRow user={item} onPress={() => setSelected(item)} />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -201,6 +357,68 @@ export function AdminResidentsView({ header, scrollY }: AdminResidentsViewProps)
   );
 }
 
+function PendingRow({
+  user,
+  busy,
+  onApprove,
+  onReject,
+}: {
+  user: ClubMember;
+  busy: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <View style={styles.pendingRow}>
+      <Image
+        source={{ uri: user.avatar ?? avatarFallback(user.fullName) }}
+        style={styles.avatar}
+      />
+      <View style={styles.rowBody}>
+        <Text style={styles.rowName} numberOfLines={1}>
+          {user.fullName}
+        </Text>
+        <Text style={styles.rowEmail} numberOfLines={1}>
+          {user.email}
+        </Text>
+        {user.unitNumber ? (
+          <View style={styles.rowMeta}>
+            <Feather name="home" size={12} color={COLORS.text.label} />
+            <Text style={styles.rowMetaText}>{user.unitNumber}</Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.pendingActions}>
+        <TouchableOpacity
+          onPress={onReject}
+          disabled={busy}
+          style={[styles.rejectBtn, busy && { opacity: 0.5 }]}
+          activeOpacity={0.85}
+          hitSlop={6}
+        >
+          <Feather name="x" size={18} color="#dc2626" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onApprove}
+          disabled={busy}
+          style={[styles.approveBtn, busy && { opacity: 0.6 }]}
+          activeOpacity={0.85}
+          hitSlop={6}
+        >
+          {busy ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Feather name="check" size={16} color="#fff" />
+              <Text style={styles.approveBtnText}>Aceptar</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -231,7 +449,7 @@ function ResidentRow({
   user,
   onPress,
 }: {
-  user: DirectoryUser;
+  user: ClubMember;
   onPress: () => void;
 }) {
   const roleColor = ROLE_COLOR[user.role];
@@ -271,7 +489,7 @@ function ResidentActionsSheet({
   user,
   onClose,
 }: {
-  user: DirectoryUser | null;
+  user: ClubMember | null;
   onClose: () => void;
 }) {
   const sendBroadcast = useAdminStore((s) => s.sendBroadcast);
@@ -328,17 +546,11 @@ function ResidentActionsSheet({
   };
 
   const handleSaveEdit = async () => {
-    if (!editName.trim()) {
-      Alert.alert('Nombre requerido', 'El nombre no puede estar vacío.');
-      return;
-    }
     setSaving(true);
     try {
-      await updateDirectoryUser(user.id, {
-        fullName: editName.trim(),
+      await updateDirectoryUser(user.membershipId, {
         role: editRole,
         unitNumber: editUnit.trim() ? editUnit.trim() : null,
-        avatar: editAvatar.trim() ? editAvatar.trim() : null,
       });
       Alert.alert('Listo', 'Cambios guardados.');
       onClose();
@@ -351,8 +563,8 @@ function ResidentActionsSheet({
 
   const handleDelete = () => {
     Alert.alert(
-      'Eliminar usuario',
-      `Esto eliminará a ${user.fullName} de la residencia. Esta acción no se puede deshacer.`,
+      'Eliminar miembro',
+      `Esto removerá a ${user.fullName} del club. Su cuenta sigue existiendo pero pierde el acceso. Esta acción no se puede deshacer.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -361,7 +573,7 @@ function ResidentActionsSheet({
           onPress: async () => {
             setRemoving(true);
             try {
-              await deleteDirectoryUser(user.id);
+              await deleteDirectoryUser(user.membershipId);
               onClose();
             } catch (e: any) {
               Alert.alert('Error', e?.message ?? 'No se pudo eliminar.');
@@ -607,6 +819,91 @@ function ActionButton({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { paddingHorizontal: 20, paddingBottom: 160 },
+
+  tabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 18,
+    backgroundColor: COLORS.light.card,
+    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  tabBtnActive: {
+    backgroundColor: COLORS.brand.tealDark,
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text.label,
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+  tabBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    backgroundColor: '#f97316',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: COLORS.light.card,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+  },
+  pendingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rejectBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.brand.tealDark,
+  },
+  approveBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
 
   statsRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   statCard: {

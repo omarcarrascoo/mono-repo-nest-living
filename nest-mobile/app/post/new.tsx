@@ -40,7 +40,7 @@ const TAG_SUGGESTIONS_ADMIN = [
 export default function NewPostScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  const activeMembershipRole = useAuthStore((s) => s.activeMembershipRole); const isAdmin = activeMembershipRole === 'admin';
 
   const createPost = useCommunityStore((s) => s.createPost);
 

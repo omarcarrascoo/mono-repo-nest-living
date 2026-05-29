@@ -10,7 +10,7 @@ export type ReservationStatus =
 @Schema({ timestamps: true })
 export class Reservation extends Document {
   @Prop({ required: true, index: true })
-  residencyId: string;
+  clubId: string;
 
   @Prop({ type: Types.ObjectId, ref: 'Amenity', required: true, index: true })
   amenityId: Types.ObjectId;
@@ -57,7 +57,7 @@ ReservationSchema.index({
 ReservationSchema.index({ userId: 1, startTime: -1 });
 
 // Vista admin por residencia
-ReservationSchema.index({ residencyId: 1, startTime: -1 });
+ReservationSchema.index({ clubId: 1, startTime: -1 });
 
 // Cron de recordatorios: busca reservas próximas no recordadas
 ReservationSchema.index({ status: 1, startTime: 1, reminderSentAt: 1 });

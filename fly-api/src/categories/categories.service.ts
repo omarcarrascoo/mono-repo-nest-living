@@ -12,9 +12,9 @@ export class CategoriesService {
     @InjectModel(Amenity.name) private amenityModel: Model<Amenity>,
   ) {}
 
-  async listForResidency(residencyId: string, includeCounts = true) {
+  async listForClub(clubId: string, includeCounts = true) {
     const categories = await this.categoryModel
-      .find({ residencyId, active: true })
+      .find({ clubId, active: true })
       .sort({ sortOrder: 1, name: 1 })
       .lean()
       .exec();
@@ -25,7 +25,7 @@ export class CategoriesService {
     // lo tienen como string y otros como ObjectId, y un $group ingenuo los
     // contaría por separado.
     const counts = await this.amenityModel.aggregate([
-      { $match: { residencyId } },
+      { $match: { clubId } },
       {
         $group: {
           _id: { $toString: '$categoryId' },
@@ -43,15 +43,15 @@ export class CategoriesService {
     }));
   }
 
-  async create(residencyId: string, dto: CreateCategoryDto) {
-    const exists = await this.categoryModel.findOne({ residencyId, slug: dto.slug });
+  async create(clubId: string, dto: CreateCategoryDto) {
+    const exists = await this.categoryModel.findOne({ clubId, slug: dto.slug });
     if (exists) throw new ConflictException('Slug already exists in this residency');
-    return this.categoryModel.create({ ...dto, residencyId });
+    return this.categoryModel.create({ ...dto, clubId });
   }
 
-  async update(id: string, residencyId: string, dto: UpdateCategoryDto) {
+  async update(id: string, clubId: string, dto: UpdateCategoryDto) {
     const updated = await this.categoryModel.findOneAndUpdate(
-      { _id: id, residencyId },
+      { _id: id, clubId },
       dto,
       { new: true },
     );
@@ -59,14 +59,14 @@ export class CategoriesService {
     return updated;
   }
 
-  async remove(id: string, residencyId: string) {
-    const used = await this.amenityModel.countDocuments({ categoryId: id, residencyId });
+  async remove(id: string, clubId: string) {
+    const used = await this.amenityModel.countDocuments({ categoryId: id, clubId });
     if (used > 0) {
       throw new ConflictException(
         `Cannot delete: ${used} amenities still use this category`,
       );
     }
-    const result = await this.categoryModel.deleteOne({ _id: id, residencyId });
+    const result = await this.categoryModel.deleteOne({ _id: id, clubId });
     if (result.deletedCount === 0) throw new NotFoundException('Category not found');
     return { success: true };
   }

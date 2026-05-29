@@ -4,12 +4,14 @@ import {
   AdminReservationStats,
   BroadcastNotificationRequest,
   BroadcastNotificationResponse,
-  DirectoryUser,
+  ClubMember,
   Order,
   OrderListFilter,
   OrderStatus,
 } from '@/types/api';
 import { adminService } from '@/services/admin.service';
+import { clubsService } from '@/services/clubs.service';
+import { useAuthStore } from './auth-store';
 
 type ReservationFilter = 'upcoming' | 'past' | 'cancelled' | 'all';
 
@@ -49,11 +51,18 @@ interface AdminState {
   orders: OrdersPanel;
   updatingOrder: Record<string, boolean>;
 
-  // Users directory
-  directory: DirectoryUser[];
+  // Users directory (memberships activas del club activo)
+  directory: ClubMember[];
   directoryLoading: boolean;
   directoryError: string | null;
   directoryQuery: string;
+
+  // Pending join requests del club activo
+  pendingMembers: ClubMember[];
+  pendingLoading: boolean;
+  pendingError: string | null;
+  /** Set de membershipIds que están siendo aprobados/rechazados ahora mismo. */
+  pendingActionInFlight: Record<string, boolean>;
 
   // Broadcast
   broadcasting: boolean;
@@ -77,16 +86,17 @@ interface AdminState {
   fetchDirectory: (q?: string) => Promise<void>;
   setDirectoryQuery: (q: string) => void;
   updateDirectoryUser: (
-    id: string,
+    membershipId: string,
     payload: {
-      fullName?: string;
       role?: 'admin' | 'user' | 'kitchen_operator';
       unitNumber?: string | null;
-      avatar?: string | null;
-      status?: string;
     },
-  ) => Promise<DirectoryUser>;
-  deleteDirectoryUser: (id: string) => Promise<void>;
+  ) => Promise<ClubMember>;
+  deleteDirectoryUser: (membershipId: string) => Promise<void>;
+
+  fetchPendingMembers: () => Promise<void>;
+  approvePendingMember: (membershipId: string) => Promise<void>;
+  rejectPendingMember: (membershipId: string) => Promise<void>;
 
   sendBroadcast: (
     payload: BroadcastNotificationRequest,
@@ -143,6 +153,11 @@ export const useAdminStore = create<AdminState>((set, get) => ({
   directoryLoading: false,
   directoryError: null,
   directoryQuery: '',
+
+  pendingMembers: [],
+  pendingLoading: false,
+  pendingError: null,
+  pendingActionInFlight: {},
 
   broadcasting: false,
   broadcastError: null,
@@ -387,19 +402,100 @@ export const useAdminStore = create<AdminState>((set, get) => ({
 
   setDirectoryQuery: (q) => set({ directoryQuery: q }),
 
-  updateDirectoryUser: async (id, payload) => {
-    const updated = await adminService.updateUser(id, payload);
+  updateDirectoryUser: async (membershipId, payload) => {
+    const updated = await adminService.updateMembership(membershipId, payload);
     set((s) => ({
-      directory: s.directory.map((u) => (u.id === id ? updated : u)),
+      directory: s.directory.map((u) =>
+        u.membershipId === membershipId ? updated : u,
+      ),
     }));
     return updated;
   },
 
-  deleteDirectoryUser: async (id) => {
-    await adminService.deleteUser(id);
+  deleteDirectoryUser: async (membershipId) => {
+    await adminService.removeMembership(membershipId);
     set((s) => ({
-      directory: s.directory.filter((u) => u.id !== id),
+      directory: s.directory.filter((u) => u.membershipId !== membershipId),
     }));
+  },
+
+  fetchPendingMembers: async () => {
+    const clubId = useAuthStore.getState().activeClubId;
+    if (!clubId) return;
+    set({ pendingLoading: true, pendingError: null });
+    try {
+      const items = await clubsService.listMembershipsAdmin(clubId, {
+        status: 'pending',
+      });
+      set({ pendingMembers: items, pendingLoading: false });
+    } catch (e: any) {
+      set({
+        pendingLoading: false,
+        pendingError: e?.message ?? 'Error cargando solicitudes',
+      });
+    }
+  },
+
+  approvePendingMember: async (membershipId) => {
+    if (get().pendingActionInFlight[membershipId]) return;
+    set((s) => ({
+      pendingActionInFlight: {
+        ...s.pendingActionInFlight,
+        [membershipId]: true,
+      },
+    }));
+    try {
+      await clubsService.approveMembership(membershipId);
+      set((s) => {
+        const next = { ...s.pendingActionInFlight };
+        delete next[membershipId];
+        return {
+          pendingMembers: s.pendingMembers.filter(
+            (m) => m.membershipId !== membershipId,
+          ),
+          pendingActionInFlight: next,
+        };
+      });
+      // Refrescar directorio para que aparezca como activo
+      void get().fetchDirectory();
+    } catch (e) {
+      set((s) => {
+        const next = { ...s.pendingActionInFlight };
+        delete next[membershipId];
+        return { pendingActionInFlight: next };
+      });
+      throw e;
+    }
+  },
+
+  rejectPendingMember: async (membershipId) => {
+    if (get().pendingActionInFlight[membershipId]) return;
+    set((s) => ({
+      pendingActionInFlight: {
+        ...s.pendingActionInFlight,
+        [membershipId]: true,
+      },
+    }));
+    try {
+      await clubsService.rejectMembership(membershipId);
+      set((s) => {
+        const next = { ...s.pendingActionInFlight };
+        delete next[membershipId];
+        return {
+          pendingMembers: s.pendingMembers.filter(
+            (m) => m.membershipId !== membershipId,
+          ),
+          pendingActionInFlight: next,
+        };
+      });
+    } catch (e) {
+      set((s) => {
+        const next = { ...s.pendingActionInFlight };
+        delete next[membershipId];
+        return { pendingActionInFlight: next };
+      });
+      throw e;
+    }
   },
 
   sendBroadcast: async (payload) => {
@@ -435,6 +531,10 @@ export const useAdminStore = create<AdminState>((set, get) => ({
       directoryLoading: false,
       directoryError: null,
       directoryQuery: '',
+      pendingMembers: [],
+      pendingLoading: false,
+      pendingError: null,
+      pendingActionInFlight: {},
       broadcasting: false,
       broadcastError: null,
       lastBroadcast: null,

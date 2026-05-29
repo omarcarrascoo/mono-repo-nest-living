@@ -22,7 +22,7 @@ export interface WeeklySchedule {
 @Schema({ timestamps: true })
 export class Amenity extends Document {
   @Prop({ required: true, index: true })
-  residencyId: string;
+  clubId: string;
 
   @Prop({ type: Types.ObjectId, ref: 'Category', index: true })
   categoryId?: Types.ObjectId;
@@ -111,5 +111,5 @@ AmenitySchema.index(
 );
 
 // Listados scoped + filter por categoría
-AmenitySchema.index({ residencyId: 1, categoryId: 1 });
-AmenitySchema.index({ residencyId: 1, status: 1 });
+AmenitySchema.index({ clubId: 1, categoryId: 1 });
+AmenitySchema.index({ clubId: 1, status: 1 });

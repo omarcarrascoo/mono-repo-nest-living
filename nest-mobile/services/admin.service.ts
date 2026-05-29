@@ -6,7 +6,7 @@ import {
   Amenity,
   BroadcastNotificationRequest,
   BroadcastNotificationResponse,
-  DirectoryUser,
+  ClubMember,
   Order,
   OrderListFilter,
   OrderStatus,
@@ -16,7 +16,7 @@ import {
 import {
   adaptAdminReservation,
   adaptAmenity,
-  adaptDirectoryUser,
+  adaptClubMember,
   adaptOrder,
   adaptProduct,
   adaptProductCategory,
@@ -44,32 +44,35 @@ export const adminService = {
     });
   },
 
-  // ----- Users directory (picker for broadcast/user audience) -----
-  async listUsers(q?: string): Promise<DirectoryUser[]> {
+  // ----- Club directory (memberships del club activo) -----
+  async listUsers(q?: string): Promise<ClubMember[]> {
     const qs = buildQuery({ q });
     const raw = await apiFetch<any[]>(`/users/directory${qs}`);
-    return Array.isArray(raw) ? raw.map(adaptDirectoryUser) : [];
+    return Array.isArray(raw) ? raw.map(adaptClubMember) : [];
   },
 
-  async updateUser(
-    id: string,
+  /**
+   * Edita rol/unidad de un miembro del club. Usa PATCH /clubs/memberships/:id.
+   * El rol global y datos personales del User no se editan desde aquí.
+   */
+  async updateMembership(
+    membershipId: string,
     payload: {
-      fullName?: string;
       role?: 'admin' | 'user' | 'kitchen_operator';
       unitNumber?: string | null;
-      avatar?: string | null;
-      status?: string;
     },
-  ): Promise<DirectoryUser> {
-    const raw = await apiFetch<any>(`/users/${id}`, {
+  ): Promise<ClubMember> {
+    const raw = await apiFetch<any>(`/clubs/memberships/${membershipId}`, {
       method: 'PATCH',
       body: payload,
     });
-    return adaptDirectoryUser(raw);
+    return adaptClubMember(raw);
   },
 
-  async deleteUser(id: string): Promise<{ ok: true }> {
-    return apiFetch<{ ok: true }>(`/users/${id}`, { method: 'DELETE' });
+  async removeMembership(membershipId: string): Promise<{ ok: true }> {
+    return apiFetch<{ ok: true }>(`/clubs/memberships/${membershipId}`, {
+      method: 'DELETE',
+    });
   },
 
   // ----- Reservations -----

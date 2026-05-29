@@ -58,7 +58,7 @@ export class OrdersService {
     const products = await this.productModel
       .find({
         _id: { $in: productIds.map((id) => new Types.ObjectId(id)) },
-        residencyId: user.residencyId,
+        clubId: user.activeClubId!,
       })
       .lean()
       .exec();
@@ -165,7 +165,7 @@ export class OrdersService {
     const orderNumber = await this.generateOrderNumber();
 
     const created = await this.orderModel.create({
-      residencyId: user.residencyId,
+      clubId: user.activeClubId!,
       userId: new Types.ObjectId(user.userId),
       orderNumber,
       items: orderItems,
@@ -202,13 +202,13 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
     const order = await this.orderModel
-      .findOne({ _id: id, residencyId: user.residencyId })
+      .findOne({ _id: id, clubId: user.activeClubId! })
       .lean()
       .exec();
     if (!order) throw new NotFoundException('Order not found');
 
     if (
-      !STAFF_ROLES.includes(user.role) &&
+      !STAFF_ROLES.includes(user.activeMembershipRole as Role) &&
       String(order.userId) !== user.userId
     ) {
       throw new ForbiddenException('Cannot view another user\'s order');
@@ -219,7 +219,7 @@ export class OrdersService {
 
   async listMine(user: CurrentUserPayload, filter?: string) {
     const q: Record<string, any> = {
-      residencyId: user.residencyId,
+      clubId: user.activeClubId!,
       userId: new Types.ObjectId(user.userId),
     };
     this.applyFilter(q, filter);
@@ -230,7 +230,7 @@ export class OrdersService {
     user: CurrentUserPayload,
     opts: { status?: string; filter?: string; userId?: string },
   ) {
-    const q: Record<string, any> = { residencyId: user.residencyId };
+    const q: Record<string, any> = { clubId: user.activeClubId! };
     if (opts.status) q.status = opts.status;
     if (opts.userId) q.userId = new Types.ObjectId(opts.userId);
     this.applyFilter(q, opts.filter);
@@ -249,15 +249,15 @@ export class OrdersService {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Order not found');
     }
-    if (!STAFF_ROLES.includes(user.role)) {
+    if (!STAFF_ROLES.includes(user.activeMembershipRole as Role)) {
       throw new ForbiddenException('Only staff can update order status');
     }
-    if (dto.status === 'cancelled' && user.role !== 'admin') {
+    if (dto.status === 'cancelled' && user.activeMembershipRole !== 'admin') {
       throw new ForbiddenException('Only admin can cancel orders');
     }
 
     const order = await this.orderModel
-      .findOne({ _id: id, residencyId: user.residencyId })
+      .findOne({ _id: id, clubId: user.activeClubId! })
       .exec();
     if (!order) throw new NotFoundException('Order not found');
 
@@ -326,7 +326,7 @@ export class OrdersService {
       body: `Tu pedido #${order.orderNumber} está pendiente de confirmación.`,
       data,
     });
-    await this.notifications.notifyOrderStaff(order.residencyId, {
+    await this.notifications.notifyOrderStaff(order.clubId, {
       kind: 'order_admin_alert',
       title: '🛒 Nuevo pedido',
       body: `Pedido #${order.orderNumber} • $${order.total.toFixed(2)}`,

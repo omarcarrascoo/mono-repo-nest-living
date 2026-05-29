@@ -7,7 +7,7 @@ export class CommunityPostReply extends Document {
   postId: Types.ObjectId;
 
   @Prop({ required: true, index: true })
-  residencyId: string;
+  clubId: string;
 
   /**
    * Parent reply id when this is a nested reply. Null/undefined for

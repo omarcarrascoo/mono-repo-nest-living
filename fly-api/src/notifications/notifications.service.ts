@@ -118,34 +118,34 @@ export class NotificationsService {
     }
   }
 
-  async notifyAdmins(residencyId: string, payload: NotifyPayload) {
-    const admins = await this.usersService.findAdminsByResidency(residencyId);
+  async notifyAdmins(clubId: string, payload: NotifyPayload) {
+    const admins = await this.usersService.findAdminsByClub(clubId);
     await Promise.all(
       admins.map((a) => this.notifyUser(String(a._id), payload)),
     );
   }
 
   /**
-   * Fan-out to admins + kitchen_operators in a residency. Used for
+   * Fan-out to admins + kitchen_operators in a club. Used for
    * order-side alerts (new pedido, escalations, etc.).
    */
-  async notifyOrderStaff(residencyId: string, payload: NotifyPayload) {
-    const staff = await this.usersService.findStaffByResidency(residencyId);
+  async notifyOrderStaff(clubId: string, payload: NotifyPayload) {
+    const staff = await this.usersService.findStaffByClub(clubId);
     await Promise.all(
       staff.map((u) => this.notifyUser(String(u._id), payload)),
     );
   }
 
   /**
-   * Broadcast to every user in a residency. Used for admin announcements
+   * Broadcast to every active member of a club. Used for admin announcements
    * posted to the community wall. Skips the sender via `excludeUserId`.
    */
-  async notifyResidency(
-    residencyId: string,
+  async notifyClub(
+    clubId: string,
     payload: NotifyPayload,
     opts: { excludeUserId?: string } = {},
   ) {
-    const users = await this.usersService.findAllByResidency(residencyId);
+    const users = await this.usersService.findAllByClub(clubId);
     await Promise.all(
       users
         .filter((u) => String(u._id) !== opts.excludeUserId)
@@ -158,7 +158,7 @@ export class NotificationsService {
    * user). The sender is always excluded from the recipient set.
    */
   async broadcast(
-    residencyId: string,
+    clubId: string,
     senderUserId: string,
     payload: {
       title: string;
@@ -180,13 +180,13 @@ export class NotificationsService {
 
     let recipients: { _id: any }[] = [];
     if (payload.audience === 'all') {
-      recipients = await this.usersService.findAllByResidency(residencyId);
+      recipients = await this.usersService.findAllByClub(clubId);
     } else if (payload.audience === 'unit') {
       if (!payload.unitPrefix) {
         throw new BadRequestException('unitPrefix required for audience=unit');
       }
-      recipients = await this.usersService.findByResidencyAndUnitPrefix(
-        residencyId,
+      recipients = await this.usersService.findByClubAndUnitPrefix(
+        clubId,
         payload.unitPrefix,
       );
     } else if (payload.audience === 'user') {
@@ -195,9 +195,11 @@ export class NotificationsService {
       }
       const target = await this.usersService.findById(payload.userId);
       if (!target) throw new NotFoundException('User not found');
-      if (String((target as any).residencyId) !== residencyId) {
-        throw new NotFoundException('User not found');
-      }
+      const isMember = await this.usersService.isUserActiveInClub(
+        payload.userId,
+        clubId,
+      );
+      if (!isMember) throw new NotFoundException('User not found');
       recipients = [{ _id: (target as any)._id }];
     }
 
@@ -293,7 +295,7 @@ export class NotificationsService {
         data,
       });
 
-      await this.notifyAdmins(String(reservation.residencyId), {
+      await this.notifyAdmins(String(reservation.clubId), {
         kind: 'admin_alert',
         title: '📋 Nueva reserva',
         body: `${amenity?.title ?? 'Amenidad'} • ${formatDateTime(reservation.startTime)}`,
@@ -324,7 +326,7 @@ export class NotificationsService {
         body,
         data,
       });
-      await this.notifyAdmins(String(reservation.residencyId), {
+      await this.notifyAdmins(String(reservation.clubId), {
         kind: 'admin_alert',
         title: 'Reserva cancelada',
         body,

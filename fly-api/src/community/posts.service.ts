@@ -35,27 +35,27 @@ export class PostsService {
 
   async create(user: CurrentUserPayload, dto: CreatePostDto) {
     const type = dto.type ?? 'post';
-    if (type === 'announcement' && user.role !== 'admin') {
+    if (type === 'announcement' && user.activeMembershipRole !== 'admin') {
       throw new ForbiddenException('Only admins can publish announcements');
     }
-    if (dto.pinned && user.role !== 'admin') {
+    if (dto.pinned && user.activeMembershipRole !== 'admin') {
       throw new ForbiddenException('Only admins can pin posts');
     }
 
     const author = await this.userModel
       .findById(user.userId)
-      .select('fullName avatar role')
+      .select('fullName avatar')
       .lean()
       .exec();
     if (!author) throw new NotFoundException('Author not found');
 
     const created = await this.postModel.create({
-      residencyId: user.residencyId,
+      clubId: user.activeClubId!,
       type,
       authorId: new Types.ObjectId(user.userId),
       authorName: author.fullName,
       authorAvatar: author.avatar,
-      authorRole: author.role,
+      authorRole: user.activeMembershipRole ?? 'user',
       tag: dto.tag,
       title: dto.title,
       content: dto.content,
@@ -67,8 +67,8 @@ export class PostsService {
 
     if (type === 'announcement') {
       this.notifications
-        .notifyResidency(
-          user.residencyId,
+        .notifyClub(
+          user.activeClubId!,
           {
             kind: 'community_announcement',
             title: `📣 ${author.fullName}: ${dto.title}`,
@@ -86,7 +86,7 @@ export class PostsService {
   }
 
   async list(user: CurrentUserPayload, query: ListPostsQueryDto) {
-    const filter: Record<string, any> = { residencyId: user.residencyId };
+    const filter: Record<string, any> = { clubId: user.activeClubId };
     if (query.type && query.type !== 'all') filter.type = query.type;
     if (query.q && query.q.trim()) {
       const re = new RegExp(escapeRegex(query.q.trim()), 'i');
@@ -105,7 +105,7 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
     const post = await this.postModel
-      .findOne({ _id: id, residencyId: user.residencyId })
+      .findOne({ _id: id, clubId: user.activeClubId })
       .lean()
       .exec();
     if (!post) throw new NotFoundException('Post not found');
@@ -115,15 +115,15 @@ export class PostsService {
   async update(user: CurrentUserPayload, id: string, dto: UpdatePostDto) {
     const post = await this.postModel.findOne({
       _id: id,
-      residencyId: user.residencyId,
+      clubId: user.activeClubId,
     });
     if (!post) throw new NotFoundException('Post not found');
 
     const isOwner = String(post.authorId) === user.userId;
-    if (!isOwner && user.role !== 'admin') {
+    if (!isOwner && user.activeMembershipRole !== 'admin') {
       throw new ForbiddenException('Cannot edit someone else\'s post');
     }
-    if (dto.pinned !== undefined && user.role !== 'admin') {
+    if (dto.pinned !== undefined && user.activeMembershipRole !== 'admin') {
       throw new ForbiddenException('Only admins can pin posts');
     }
 
@@ -139,12 +139,12 @@ export class PostsService {
   async remove(user: CurrentUserPayload, id: string) {
     const post = await this.postModel.findOne({
       _id: id,
-      residencyId: user.residencyId,
+      clubId: user.activeClubId,
     });
     if (!post) throw new NotFoundException('Post not found');
 
     const isOwner = String(post.authorId) === user.userId;
-    if (!isOwner && user.role !== 'admin') {
+    if (!isOwner && user.activeMembershipRole !== 'admin') {
       throw new ForbiddenException('Cannot delete someone else\'s post');
     }
 
@@ -160,7 +160,7 @@ export class PostsService {
   ) {
     const post = await this.postModel.findOne({
       _id: id,
-      residencyId: user.residencyId,
+      clubId: user.activeClubId,
     });
     if (!post) throw new NotFoundException('Post not found');
 

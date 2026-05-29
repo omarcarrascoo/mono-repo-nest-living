@@ -31,7 +31,7 @@ export default function ReservationsScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const tz = user?.timezone ?? getUserTimezone();
-  const isAdmin = user?.role === 'admin';
+  const activeMembershipRole = useAuthStore((s) => s.activeMembershipRole); const isAdmin = activeMembershipRole === 'admin';
 
   const [activeFilter, setActiveFilter] = React.useState<FilterKey>('upcoming');
 

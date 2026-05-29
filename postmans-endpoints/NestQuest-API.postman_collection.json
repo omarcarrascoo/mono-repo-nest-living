@@ -70,6 +70,26 @@
 			"key": "replyId",
 			"value": "",
 			"type": "string"
+		},
+		{
+			"key": "activeClubId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "clubId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "membershipId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "joinCode",
+			"value": "",
+			"type": "string"
 		}
 	],
 	"item": [
@@ -116,9 +136,6 @@
 									"const json = pm.response.json();",
 									"if (json && (json._id || json.id)) {",
 									"  pm.collectionVariables.set('userId', json._id || json.id);",
-									"}",
-									"if (json && json.residencyId) {",
-									"  pm.collectionVariables.set('residencyId', json.residencyId);",
 									"}"
 								]
 							}
@@ -134,7 +151,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"fullName\": \"Admin User\",\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"admin\",\n  \"residencyId\": \"res-001\",\n  \"unitNumber\": \"A-101\"\n}"
+							"raw": "{\n  \"fullName\": \"María Pérez\",\n  \"email\": \"maria@example.com\",\n  \"password\": \"password123\",\n  \"dateOfBirth\": \"1995-08-15\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/auth/register",
@@ -146,7 +163,7 @@
 								"register"
 							]
 						},
-						"description": "Crea un usuario nuevo. Campos:\n- `fullName` (string, requerido)\n- `email` (string, requerido, único)\n- `password` (string, mínimo 6)\n- `role` ('user' | 'admin', default 'user')\n- `residencyId` (string, requerido — multitenancy)\n- `unitNumber` (string, opcional)\n\nDevuelve el documento del usuario creado (sin password)."
+						"description": "Crea un usuario nuevo como `user` regular sin club asignado.\n\nCampos:\n- `fullName` (string, 2-120, requerido)\n- `email` (string, requerido, único)\n- `password` (string, mínimo 6)\n- `dateOfBirth` (ISO-8601 date string, opcional)\n\n**No se permite asignar `role`/`globalRole`/`clubId` desde el registro** — el usuario empieza sin rol y debe unirse a un club vía `POST /clubs/join` con un código generado por un super admin.\n\nDevuelve el documento del usuario creado (sin password)."
 					},
 					"response": []
 				},
@@ -169,7 +186,9 @@
 									"",
 									"if (json && json.access_token) {",
 									"  pm.collectionVariables.set('accessToken', json.access_token);",
-									"  console.log('accessToken guardado en variables de la colección.');",
+									"}",
+									"if (json && json.activeClubId) {",
+									"  pm.collectionVariables.set('activeClubId', json.activeClubId);",
 									"}"
 								]
 							}
@@ -197,7 +216,65 @@
 								"login"
 							]
 						},
-						"description": "Devuelve `{ access_token: string }`.\n\nEl test script captura el token automáticamente y lo guarda en `{{accessToken}}` para que el resto de la colección lo use vía Bearer Auth.\n\n**401** si las credenciales son inválidas."
+						"description": "Devuelve `{ access_token: string, activeClubId: string | null, activeMembershipRole: string | null }`.\n\nEl JWT incluye `userId`, `email`, `globalRole`, `activeClubId` y `activeMembershipRole`. Si el usuario no es miembro activo de ningún club, `activeClubId` es `null` y debe llamar `POST /clubs/join` antes de acceder a recursos scope-ados.\n\nEl test script captura el token y `activeClubId` automáticamente.\n\n**401** si las credenciales son inválidas."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /auth/switch-club",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('status 200', function () {",
+									"  pm.response.to.have.status(200);",
+									"});",
+									"const json = pm.response.json();",
+									"if (json && json.access_token) {",
+									"  pm.collectionVariables.set('accessToken', json.access_token);",
+									"}",
+									"if (json && json.activeClubId) {",
+									"  pm.collectionVariables.set('activeClubId', json.activeClubId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clubId\": \"{{clubId}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/switch-club",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"switch-club"
+							]
+						},
+						"description": "Re-emite el JWT con un nuevo `activeClubId`. El usuario debe ser miembro activo del club target.\n\nBody: `{ clubId: string }`\n\nResponse: `{ access_token, activeClubId, activeMembershipRole }`. El test script reemplaza el `accessToken` automáticamente.\n\n**403** si el usuario no es miembro activo del club."
 					},
 					"response": []
 				}
@@ -228,13 +305,9 @@
 									"pm.test('status 200', function () {",
 									"  pm.response.to.have.status(200);",
 									"});",
-									"",
 									"const json = pm.response.json();",
 									"if (json && (json._id || json.id)) {",
 									"  pm.collectionVariables.set('userId', json._id || json.id);",
-									"}",
-									"if (json && json.residencyId) {",
-									"  pm.collectionVariables.set('residencyId', json.residencyId);",
 									"}"
 								]
 							}
@@ -253,7 +326,7 @@
 								"me"
 							]
 						},
-						"description": "Devuelve el usuario asociado al token actual (sin password).\n\nIncluye `favorites: string[]` (ids de amenidades) y `notificationPreferences: { reservationReminders, reservationUpdates, adminAlerts }`.\n\nEl frontend llama esto al iniciar la app para hidratar la sesión."
+						"description": "Devuelve el usuario asociado al token actual (sin password).\n\nIncluye `favoriteAmenityIds: ObjectId[]`, `notificationPreferences: { reservationReminders, reservationUpdates, adminAlerts }` y `globalRole: 'super_admin' | null`.\n\n**Memberships y club activo** ya NO viven aquí — para listarlos llama a `GET /clubs/me/memberships`. Para saber el club activo del JWT, decodifica el `access_token` o úsalo implícitamente en endpoints scope-ados."
 					},
 					"response": []
 				},
@@ -274,6 +347,34 @@
 							]
 						},
 						"description": "Devuelve los IDs de amenidades favoritas del usuario.\n\n**Response:** `{ ids: string[] }`\n\nEl frontend usa esto al hidratar el `favorites-store` en lugar de filtrar `/amenities?favorite=true` (más liviano)."
+					},
+					"response": []
+				},
+				{
+					"name": "PATCH /users/me",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"María Pérez García\",\n  \"avatar\": \"https://example.com/avatar.jpg\",\n  \"dateOfBirth\": \"1995-08-15\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"me"
+							]
+						},
+						"description": "Actualiza el propio perfil. Todos los campos opcionales:\n- `fullName` (string 1-120)\n- `avatar` (string|null) — `null` lo limpia\n- `dateOfBirth` (ISO-8601|null)\n\nDevuelve el usuario actualizado sin `password`. **No** permite cambiar `role`, `globalRole`, ni datos de club — eso vive en `Clubs`."
 					},
 					"response": []
 				},
@@ -328,12 +429,90 @@
 								}
 							]
 						},
-						"description": "Directorio de usuarios scoped por residencia del JWT. Solo `admin`.\n\nDevuelve hasta 100 usuarios ordenados por `fullName`, con `_id`, `email`, `fullName`, `role`, `avatar`, `unitNumber`. Sirve como picker para el broadcast por usuario y para listados administrativos del panel."
+						"description": "Directorio de miembros del **club activo** del JWT. Solo `admin` del club.\n\nDevuelve hasta 200 memberships activas, cada una enriquecida con `id` (userId), `email`, `fullName`, `avatar`, `role` (rol en el club), `unitNumber`, `status`, `membershipId`.\n\nQuery: `?q=` busca en fullName/email/unitNumber (insensitive). El resultado se ordena por `fullName`."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Clubs",
+			"description": "Multi-tenancy. Cada `Club` es un fraccionamiento independiente. La membresía vive en el join table `Membership(userId × clubId × role × status)`.\n\n**Roles:** `super_admin` (global, en User) crea/destruye clubs y promueve admins. `admin` (per-club, en Membership) gestiona el club. `user`/`kitchen_operator` son miembros normales.\n\nPrivacidad: `public` → todos los joins quedan `active` inmediatamente. `private` → quedan `pending` y un admin debe aprobar.\n\nTodos los endpoints requieren JWT. Algunos requieren super_admin (global) y otros admin del club target.",
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{accessToken}}",
+						"type": "string"
+					}
+				]
+			},
+			"item": [
+				{
+					"name": "POST /clubs (super_admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const json = pm.response.json();",
+									"if (json && (json._id || json.id)) {",
+									"  pm.collectionVariables.set('clubId', json._id || json.id);",
+									"}",
+									"if (json && json.joinCode) {",
+									"  pm.collectionVariables.set('joinCode', json.joinCode);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Residencial Las Palmas\",\n  \"description\": \"Fraccionamiento privado en Av. Reforma 1234\",\n  \"privacy\": \"private\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/clubs",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs"
+							]
+						},
+						"description": "Crea un club nuevo. Solo `super_admin` (global).\n\nBody: `{ name (3-120), description?, privacy: 'public'|'private' (default 'public') }`\n\nGenera un `joinCode` aleatorio único de 8 chars (mayúsculas+dígitos sin caracteres confundibles). El test script guarda `clubId` y `joinCode` automáticamente."
 					},
 					"response": []
 				},
 				{
-					"name": "PATCH /users/:id (admin)",
+					"name": "GET /clubs (super_admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clubs",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs"
+							]
+						},
+						"description": "Lista todos los clubs del sistema. Solo `super_admin`."
+					},
+					"response": []
+				},
+				{
+					"name": "PATCH /clubs/:clubId (super_admin)",
 					"request": {
 						"method": "PATCH",
 						"header": [
@@ -344,50 +523,327 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"fullName\": \"Lucía Hernández\",\n  \"role\": \"user\",\n  \"unitNumber\": \"B-204\",\n  \"avatar\": \"https://example.com/avatar.jpg\",\n  \"status\": \"ACTIVE\"\n}"
+							"raw": "{\n  \"name\": \"Residencial Las Palmas (renombrado)\",\n  \"privacy\": \"public\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/users/:id",
+							"raw": "{{baseUrl}}/clubs/:clubId",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"users",
-								":id"
+								"clubs",
+								":clubId"
 							],
 							"variable": [
 								{
-									"key": "id",
-									"value": ""
+									"key": "clubId",
+									"value": "{{clubId}}"
 								}
 							]
 						},
-						"description": "Actualiza un usuario de la residencia. Solo `admin`. Scoped por `residencyId` del JWT.\n\nCampos opcionales (todos):\n- `fullName` (string, 1-120).\n- `role` ('admin' | 'user' | 'kitchen_operator').\n- `unitNumber` (string | null) — `null` lo limpia.\n- `avatar` (string | null) — `null` lo limpia.\n- `status` (string, 1-40).\n\nDevuelve el usuario actualizado sin `password`. 404 si no existe en la residencia."
+						"description": "Actualiza nombre/description/privacy del club. Solo `super_admin`. **No** permite cambiar `joinCode` (eso requiere otro endpoint si lo agregamos)."
 					},
 					"response": []
 				},
 				{
-					"name": "DELETE /users/:id (admin)",
+					"name": "DELETE /clubs/:clubId (super_admin)",
 					"request": {
 						"method": "DELETE",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/users/:id",
+							"raw": "{{baseUrl}}/clubs/:clubId",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
-								"users",
-								":id"
+								"clubs",
+								":clubId"
 							],
 							"variable": [
 								{
-									"key": "id",
-									"value": ""
+									"key": "clubId",
+									"value": "{{clubId}}"
 								}
 							]
 						},
-						"description": "Elimina un usuario de la residencia. Solo `admin`. Scoped por `residencyId` del JWT.\n\n- 403 si intentas borrarte a ti mismo.\n- 404 si el usuario no existe o no pertenece a tu residencia.\n\nResponse: `{ ok: true }`."
+						"description": "Elimina un club. **Cuidado:** esto deja huérfanas las memberships y todos los recursos scope-ados (amenities, posts, etc.). Solo `super_admin`."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /clubs/:clubId/admins (super_admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{userId}}\",\n  \"unitNumber\": \"A-101\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/clubs/:clubId/admins",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								":clubId",
+								"admins"
+							],
+							"variable": [
+								{
+									"key": "clubId",
+									"value": "{{clubId}}"
+								}
+							]
+						},
+						"description": "Promueve a un usuario a `admin` del club. Crea o actualiza la membership con `role='admin'` y `status='active'` (saltándose la cola de pending). Solo `super_admin`.\n\nBody: `{ userId, unitNumber? }`."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /clubs/join",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const json = pm.response.json();",
+									"if (json && json.membershipId) {",
+									"  pm.collectionVariables.set('membershipId', json.membershipId);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"joinCode\": \"{{joinCode}}\",\n  \"unitNumber\": \"A-101\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/clubs/join",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								"join"
+							]
+						},
+						"description": "Une al usuario actual al club que tenga `joinCode`. \n\n- Si el club es `public`: la membership se crea con `status='active'` y el usuario puede operar inmediatamente. Necesita llamar `POST /auth/switch-club` para activar el club en su JWT.\n- Si el club es `private`: la membership queda `pending` y un admin debe aprobarla.\n\nBody: `{ joinCode, unitNumber? }`. Devuelve `{ status, clubId, membershipId, club: { name, privacy } }`."
+					},
+					"response": []
+				},
+				{
+					"name": "GET /clubs/me/memberships",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clubs/me/memberships",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								"me",
+								"memberships"
+							]
+						},
+						"description": "Lista todas las memberships del usuario actual con el club poblado (name, privacy). Cada item: `{ membershipId, clubId, club: {name, privacy}, role, status, unitNumber }`."
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE /clubs/me/memberships/:clubId",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clubs/me/memberships/:clubId",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								"me",
+								"memberships",
+								":clubId"
+							],
+							"variable": [
+								{
+									"key": "clubId",
+									"value": "{{clubId}}"
+								}
+							]
+						},
+						"description": "El usuario abandona el club. **Bloqueado** si es el último admin activo del club (responde 409). Si lograste salir, llama `POST /auth/switch-club` con otro club o vuelve a hacer login."
+					},
+					"response": []
+				},
+				{
+					"name": "GET /clubs/:clubId/memberships (admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clubs/:clubId/memberships?status=pending&q=",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								":clubId",
+								"memberships"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending",
+									"description": "pending|active|rejected"
+								},
+								{
+									"key": "q",
+									"value": "",
+									"description": "fullName|email|unitNumber"
+								}
+							],
+							"variable": [
+								{
+									"key": "clubId",
+									"value": "{{clubId}}"
+								}
+							]
+						},
+						"description": "Lista memberships del club. Solo admins del club. Filtros opcionales: `?status=pending|active|rejected`, `?q=`."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /clubs/memberships/:membershipId/approve (admin)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clubs/memberships/:membershipId/approve",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								"memberships",
+								":membershipId",
+								"approve"
+							],
+							"variable": [
+								{
+									"key": "membershipId",
+									"value": "{{membershipId}}"
+								}
+							]
+						},
+						"description": "Aprueba una membership pending. Solo admin del club destino. Pasa `status='active'`, registra `approvedAt` y `approvedById`."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /clubs/memberships/:membershipId/reject (admin)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clubs/memberships/:membershipId/reject",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								"memberships",
+								":membershipId",
+								"reject"
+							],
+							"variable": [
+								{
+									"key": "membershipId",
+									"value": "{{membershipId}}"
+								}
+							]
+						},
+						"description": "Rechaza una membership pending. Solo admin del club destino."
+					},
+					"response": []
+				},
+				{
+					"name": "PATCH /clubs/memberships/:membershipId (admin)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"role\": \"admin\",\n  \"unitNumber\": \"B-202\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/clubs/memberships/:membershipId",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								"memberships",
+								":membershipId"
+							],
+							"variable": [
+								{
+									"key": "membershipId",
+									"value": "{{membershipId}}"
+								}
+							]
+						},
+						"description": "Edita una membership existente. Solo admin del club. Body parcial: `{ role?: 'admin'|'user'|'kitchen_operator', unitNumber?: string|null }`. **Bloquea** demote del último admin (responde 409)."
+					},
+					"response": []
+				},
+				{
+					"name": "DELETE /clubs/memberships/:membershipId (admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/clubs/memberships/:membershipId",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"clubs",
+								"memberships",
+								":membershipId"
+							],
+							"variable": [
+								{
+									"key": "membershipId",
+									"value": "{{membershipId}}"
+								}
+							]
+						},
+						"description": "Expulsa a un miembro del club. Solo admin del club. **Bloquea** remove del último admin."
 					},
 					"response": []
 				}
@@ -2172,5 +2628,6 @@
 				}
 			]
 		}
-	]
+	],
+	"description": ""
 }

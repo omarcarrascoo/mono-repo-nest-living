@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { COLORS, THEME } from '@/constants/theme';
 import { useRouter } from 'expo-router';
+import { ActiveClubSwitcher } from './ActiveClubSwitcher';
 
 type HeaderVariant = 'minimal' | 'standard';
 
@@ -68,19 +69,9 @@ export const DashboardHeader = ({
           <Text style={isStandard ? styles.greetingStandard : styles.greetingMinimal}>
             Hola, {userName}
           </Text>
-          
-          {/* Contenedor de ubicación: Píldora vs Texto Glass */}
-          <View style={isStandard ? styles.locationPill : styles.locationRowMinimal}>
-            <Feather 
-              name="map-pin" 
-              size={SIZES.locationSize} 
-              color={isStandard ? COLORS.brand.tealDark : COLORS.text.inverse} 
-              style={!isStandard && { opacity: 0.8 }}
-            />
-            <Text style={isStandard ? styles.locationTextStandard : styles.locationTextMinimal}>
-              {location}
-            </Text>
-          </View>
+
+          {/* Switcher del club activo (reemplaza la píldora estática "Torre B") */}
+          <ActiveClubSwitcher variant="compact" />
         </View>
       </View>
 

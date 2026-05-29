@@ -11,6 +11,7 @@ import {
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ActiveClubGuard } from '../auth/guards/active-club.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
@@ -22,7 +23,7 @@ import {
 } from './dto/order.dto';
 
 @Controller('delivery/orders')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ActiveClubGuard, RolesGuard)
 export class OrdersController {
   constructor(private readonly service: OrdersService) {}
 

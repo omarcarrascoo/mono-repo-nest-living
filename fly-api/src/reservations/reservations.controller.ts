@@ -12,6 +12,7 @@ import {
 import { ReservationsService } from './reservations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ActiveClubGuard } from '../auth/guards/active-club.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
@@ -24,7 +25,7 @@ import {
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Controller('reservations')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ActiveClubGuard, RolesGuard)
 export class ReservationsController {
   constructor(
     private readonly reservations: ReservationsService,
@@ -38,7 +39,7 @@ export class ReservationsController {
   ) {
     const reservation = await this.reservations.create(
       user.userId,
-      user.residencyId,
+      user.activeClubId!,
       dto.amenityId,
       dto.startTime,
       dto.notes,
@@ -66,8 +67,8 @@ export class ReservationsController {
     @CurrentUser() user: CurrentUserPayload,
     @Query() query: AdminListReservationsQueryDto,
   ) {
-    return this.reservations.listForResidency({
-      residencyId: user.residencyId,
+    return this.reservations.listForClub({
+      clubId: user.activeClubId!,
       filter: query.filter ?? 'upcoming',
       userId: query.userId,
       amenityId: query.amenityId,
@@ -79,7 +80,7 @@ export class ReservationsController {
   @Get('admin/stats')
   @Roles('admin')
   stats(@CurrentUser() user: CurrentUserPayload) {
-    return this.reservations.getAdminStats(user.residencyId);
+    return this.reservations.getAdminStats(user.activeClubId!);
   }
 
   @Get(':id')
@@ -87,7 +88,7 @@ export class ReservationsController {
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.reservations.findOne(id, user.userId, user.role === 'admin');
+    return this.reservations.findOne(id, user.userId, user.activeMembershipRole === 'admin');
   }
 
   @Patch(':id')
@@ -98,12 +99,12 @@ export class ReservationsController {
   ) {
     if (!dto.startTime) {
       // Solo notes — actualización trivial, sin race
-      return this.reservations.findOne(id, user.userId, user.role === 'admin');
+      return this.reservations.findOne(id, user.userId, user.activeMembershipRole === 'admin');
     }
     const r = await this.reservations.modify(
       id,
       user.userId,
-      user.role === 'admin',
+      user.activeMembershipRole === 'admin',
       dto.startTime,
       dto.notes,
     );
@@ -119,7 +120,7 @@ export class ReservationsController {
     const r = await this.reservations.cancel(
       id,
       user.userId,
-      user.role === 'admin',
+      user.activeMembershipRole === 'admin',
     );
     void this.notifications.notifyReservationCancelled(r);
     return r;

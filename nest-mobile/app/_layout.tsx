@@ -15,6 +15,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
   const hydrated = useAuthStore((s) => s.hydrated);
   const status = useAuthStore((s) => s.status);
+  const activeClubId = useAuthStore((s) => s.activeClubId);
   const hydrate = useAuthStore((s) => s.hydrate);
 
   usePushRegistration();
@@ -25,26 +26,38 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
+    const top = segments[0] as string | undefined;
     const inProtectedGroup =
-      segments[0] === '(tabs)' ||
-      segments[0] === 'amenity' ||
-      segments[0] === 'profile' ||
-      segments[0] === 'reservation' ||
-      segments[0] === 'delivery' ||
-      segments[0] === 'orders' ||
-      segments[0] === 'notifications' ||
-      segments[0] === 'post';
-    const onAuthScreen = segments.length === 0 || segments[0] === 'register' || (segments[0] as string) === 'index';
+      top === '(tabs)' ||
+      top === 'amenity' ||
+      top === 'profile' ||
+      top === 'reservation' ||
+      top === 'delivery' ||
+      top === 'orders' ||
+      top === 'notifications' ||
+      top === 'post';
+    const onAuthScreen =
+      segments.length === 0 || top === 'register' || top === 'index';
+    const onClubsFlow = top === 'clubs';
 
-    if (status !== 'authenticated' && inProtectedGroup) {
+    if (status !== 'authenticated' && (inProtectedGroup || onClubsFlow)) {
       router.replace('/');
-    } else if (status === 'authenticated' && onAuthScreen && segments[0] !== '(tabs)') {
-      const top = segments[0];
-      if (top === undefined || top === 'register') {
-        router.replace('/(tabs)');
+      return;
+    }
+    if (status === 'authenticated') {
+      // Sin club activo → forzar al flujo de unirse a un club.
+      if (!activeClubId && (inProtectedGroup || onAuthScreen)) {
+        if (!onClubsFlow) router.replace('/clubs/join');
+        return;
+      }
+      // Con club activo y en pantalla de auth → al home.
+      if (activeClubId && onAuthScreen && top !== '(tabs)') {
+        if (top === undefined || top === 'register' || top === 'index') {
+          router.replace('/(tabs)');
+        }
       }
     }
-  }, [hydrated, status, segments, router]);
+  }, [hydrated, status, activeClubId, segments, router]);
 
   if (!hydrated) {
     return (
@@ -72,6 +85,7 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="index" options={{ headerShown: false, title: 'Login' }} />
           <Stack.Screen name="register" options={{ headerShown: false, title: 'Crear cuenta' }} />
+          <Stack.Screen name="clubs" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="amenity" options={{ headerShown: false }} />
           <Stack.Screen name="reservation" options={{ headerShown: false }} />

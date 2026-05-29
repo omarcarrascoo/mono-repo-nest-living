@@ -35,7 +35,7 @@ export default function PostThreadScreen() {
   const postId = String(params.id ?? '');
 
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  const activeMembershipRole = useAuthStore((s) => s.activeMembershipRole); const isAdmin = activeMembershipRole === 'admin';
 
   const cached = useCommunityStore((s) => s.byId[postId]);
   const getPost = useCommunityStore((s) => s.getPost);

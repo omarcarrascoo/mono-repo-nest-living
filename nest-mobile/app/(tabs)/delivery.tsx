@@ -28,7 +28,7 @@ import { useNotificationsStore } from '@/stores/notifications-store';
 export default function DeliveryScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  const activeMembershipRole = useAuthStore((s) => s.activeMembershipRole); const isAdmin = activeMembershipRole === 'admin';
 
   const products = useDeliveryStore((s) => s.products);
   const categories = useDeliveryStore((s) => s.categories);

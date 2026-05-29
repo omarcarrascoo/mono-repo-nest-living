@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { AmenitiesModule } from './amenities/amenities.module';
 import { UsersModule } from './users/users.module';
+import { ClubsModule } from './clubs/clubs.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -22,6 +23,7 @@ import { CommunityModule } from './community/community.module';
 
     AuthModule,
     UsersModule,
+    ClubsModule,
     CategoriesModule,
     AmenitiesModule,
     ReservationsModule,

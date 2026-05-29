@@ -42,11 +42,11 @@ const EMPTY_LEASE: ResidentLease = {
   daysLeft: 0,
 };
 
-function toProfile(u: AuthUser): UserProfile {
+function toProfile(u: AuthUser, unitNumber?: string): UserProfile {
   return {
     id: u.id,
     fullName: u.fullName,
-    unitNumber: u.unitNumber ?? 'Sin unidad',
+    unitNumber: unitNumber ?? 'Sin unidad',
     email: u.email,
     phone: '—',
     status: (u.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE') as
@@ -55,21 +55,13 @@ function toProfile(u: AuthUser): UserProfile {
     avatar:
       u.avatar ??
       `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName)}&background=0F766E&color=fff`,
-    stats: {
-      balanceOwed: u.stats?.balanceOwed ?? EMPTY_STATS.balanceOwed,
-      delinquencyRate: u.stats?.delinquencyRate ?? EMPTY_STATS.delinquencyRate,
-      lastPaymentDate:
-        u.stats?.lastPaymentDate ?? EMPTY_STATS.lastPaymentDate,
-    },
-    lease: {
-      startDate: u.lease?.startDate ?? EMPTY_LEASE.startDate,
-      endDate: u.lease?.endDate ?? EMPTY_LEASE.endDate,
-      rentAmount: u.lease?.rentAmount ?? EMPTY_LEASE.rentAmount,
-      securityDeposit: u.lease?.securityDeposit ?? EMPTY_LEASE.securityDeposit,
-      daysLeft: u.lease?.daysLeft ?? EMPTY_LEASE.daysLeft,
-    },
-    contacts: (u.contacts ?? []) as ResidentContact[],
-    documents: (u.documents ?? []) as ResidentDocument[],
+    // Stats / lease / contacts / documents ya no viven en User — son datos
+    // que un día el club tendrá scope-ado por Membership. Por ahora mostramos
+    // valores vacíos para no romper la UI.
+    stats: { ...EMPTY_STATS },
+    lease: { ...EMPTY_LEASE },
+    contacts: [] as ResidentContact[],
+    documents: [] as ResidentDocument[],
   };
 }
 
@@ -96,6 +88,11 @@ export default function UserProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const refreshUser = useAuthStore((s) => s.refreshUser);
   const logout = useAuthStore((s) => s.logout);
+  const memberships = useAuthStore((s) => s.memberships);
+  const activeClubId = useAuthStore((s) => s.activeClubId);
+  const activeMembership = memberships.find(
+    (m) => m.clubId === activeClubId && m.status === 'active',
+  );
 
   const [refreshing, setRefreshing] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -136,7 +133,7 @@ export default function UserProfileScreen() {
     );
   }
 
-  const profile = toProfile(user);
+  const profile = toProfile(user, activeMembership?.unitNumber);
   const hasContacts = profile.contacts.length > 0;
   const hasDocs = profile.documents.length > 0;
 
@@ -166,8 +163,8 @@ export default function UserProfileScreen() {
             <View style={styles.separator} />
             <InfoRow
               icon="home"
-              label="Residencia"
-              value={user.residencyId ?? '—'}
+              label="Club activo"
+              value={activeMembership?.club?.name ?? '—'}
             />
           </View>
 

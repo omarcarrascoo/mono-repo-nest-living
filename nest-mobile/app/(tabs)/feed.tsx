@@ -35,7 +35,7 @@ export default function FeedUnifiedScreen() {
   const router = useRouter();
 
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  const activeMembershipRole = useAuthStore((s) => s.activeMembershipRole); const isAdmin = activeMembershipRole === 'admin';
 
   const items = useCommunityStore((s) => s.items);
   const filter = useCommunityStore((s) => s.filter);

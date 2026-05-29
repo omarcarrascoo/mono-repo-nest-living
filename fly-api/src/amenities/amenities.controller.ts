@@ -13,6 +13,7 @@ import {
 import { AmenitiesService } from './amenities.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ActiveClubGuard } from '../auth/guards/active-club.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUserPayload } from '../auth/decorators/current-user.decorator';
@@ -27,7 +28,7 @@ import {
 import { ReservationsService } from '../reservations/reservations.service';
 
 @Controller('amenities')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, ActiveClubGuard, RolesGuard)
 export class AmenitiesController {
   private readonly logger = new Logger(AmenitiesController.name);
 
@@ -43,7 +44,7 @@ export class AmenitiesController {
   ) {
     return this.amenitiesService.list({
       userId: user.userId,
-      residencyId: user.residencyId,
+      clubId: user.activeClubId!,
       q: query.q,
       categoryId: query.category,
       favoritesOnly: query.favorite === 'true',
@@ -55,7 +56,7 @@ export class AmenitiesController {
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.amenitiesService.findOne(id, user.residencyId);
+    return this.amenitiesService.findOne(id, user.activeClubId!);
   }
 
   @Get(':id/availability')
@@ -66,7 +67,7 @@ export class AmenitiesController {
   ) {
     return this.reservationsService.getAvailability(
       id,
-      user.residencyId,
+      user.activeClubId!,
       query.date,
     );
   }
@@ -79,7 +80,7 @@ export class AmenitiesController {
     return this.amenitiesService.toggleFavorite(
       user.userId,
       id,
-      user.residencyId,
+      user.activeClubId!,
       true,
     );
   }
@@ -92,7 +93,7 @@ export class AmenitiesController {
     return this.amenitiesService.toggleFavorite(
       user.userId,
       id,
-      user.residencyId,
+      user.activeClubId!,
       false,
     );
   }
@@ -105,9 +106,9 @@ export class AmenitiesController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     this.logger.debug(
-      `Creating amenity for residency ${user.residencyId} by ${user.email}`,
+      `Creating amenity for residency ${user.activeClubId!} by ${user.email}`,
     );
-    return this.amenitiesService.create({ ...dto, residencyId: user.residencyId });
+    return this.amenitiesService.create({ ...dto, clubId: user.activeClubId! });
   }
 
   @Put(':id')
@@ -117,7 +118,7 @@ export class AmenitiesController {
     @Body() dto: UpdateAmenityDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.amenitiesService.update(id, user.residencyId, dto);
+    return this.amenitiesService.update(id, user.activeClubId!, dto);
   }
 
   @Delete(':id')
@@ -126,6 +127,6 @@ export class AmenitiesController {
     @Param('id') id: string,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.amenitiesService.remove(id, user.residencyId);
+    return this.amenitiesService.remove(id, user.activeClubId!);
   }
 }

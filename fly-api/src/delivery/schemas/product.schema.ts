@@ -44,7 +44,7 @@ class ProductOptionGroup {
 @Schema({ timestamps: true })
 export class Product extends Document {
   @Prop({ required: true, index: true })
-  residencyId: string;
+  clubId: string;
 
   @Prop({
     type: Types.ObjectId,
@@ -96,9 +96,9 @@ export class Product extends Document {
 
 export const ProductSchema = SchemaFactory.createForClass(Product);
 
-ProductSchema.index({ residencyId: 1, categoryId: 1 });
-ProductSchema.index({ residencyId: 1, status: 1 });
-ProductSchema.index({ residencyId: 1, featured: 1 });
+ProductSchema.index({ clubId: 1, categoryId: 1 });
+ProductSchema.index({ clubId: 1, status: 1 });
+ProductSchema.index({ clubId: 1, featured: 1 });
 ProductSchema.index(
   { name: 'text', description: 'text', tags: 'text' },
   { name: 'product_text_index', default_language: 'spanish' },

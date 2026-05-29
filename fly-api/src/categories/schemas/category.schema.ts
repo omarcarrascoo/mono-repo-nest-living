@@ -4,7 +4,7 @@ import { Document } from 'mongoose';
 @Schema({ timestamps: true })
 export class Category extends Document {
   @Prop({ required: true, index: true })
-  residencyId: string;
+  clubId: string;
 
   @Prop({ required: true })
   name: string;
@@ -26,5 +26,5 @@ export class Category extends Document {
 }
 
 export const CategorySchema = SchemaFactory.createForClass(Category);
-CategorySchema.index({ residencyId: 1, slug: 1 }, { unique: true });
-CategorySchema.index({ residencyId: 1, active: 1, sortOrder: 1 });
+CategorySchema.index({ clubId: 1, slug: 1 }, { unique: true });
+CategorySchema.index({ clubId: 1, active: 1, sortOrder: 1 });

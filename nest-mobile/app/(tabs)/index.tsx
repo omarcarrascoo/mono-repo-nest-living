@@ -40,7 +40,7 @@ function toCard(item: Amenity): AmenityItem {
 export default function UnifiedAmenitiesScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
+  const activeMembershipRole = useAuthStore((s) => s.activeMembershipRole); const isAdmin = activeMembershipRole === 'admin';
 
   const items = useAmenitiesStore((s) => s.items);
   const loading = useAmenitiesStore((s) => s.loading);
@@ -182,7 +182,6 @@ export default function UnifiedAmenitiesScreen() {
               'https://i.pravatar.cc/150?u=a042581f4e29026024d'
             }
             userName={user?.fullName?.split(' ')[0] ?? 'Vecino'}
-            location={user?.unitNumber ?? user?.residencyId ?? 'Tu residencia'}
             hasUnread={unreadCount > 0}
             onMenuPress={() => router.push('/notifications' as never)}
           />

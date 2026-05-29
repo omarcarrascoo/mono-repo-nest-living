@@ -44,7 +44,7 @@ export class RepliesService {
       throw new NotFoundException('Post not found');
     }
     const post = await this.postModel
-      .findOne({ _id: postId, residencyId: user.residencyId })
+      .findOne({ _id: postId, clubId: user.activeClubId })
       .select('_id')
       .lean()
       .exec();
@@ -70,7 +70,7 @@ export class RepliesService {
     }
     const post = await this.postModel.findOne({
       _id: postId,
-      residencyId: user.residencyId,
+      clubId: user.activeClubId,
     });
     if (!post) throw new NotFoundException('Post not found');
 
@@ -93,20 +93,20 @@ export class RepliesService {
 
     const author = await this.userModel
       .findById(user.userId)
-      .select('fullName avatar role')
+      .select('fullName avatar')
       .lean()
       .exec();
     if (!author) throw new NotFoundException('Author not found');
 
     const created = await this.replyModel.create({
       postId: post._id,
-      residencyId: user.residencyId,
+      clubId: user.activeClubId!,
       parentReplyId: parentReply ? parentReply._id : null,
       depth,
       authorId: new Types.ObjectId(user.userId),
       authorName: author.fullName,
       authorAvatar: author.avatar,
-      authorRole: author.role,
+      authorRole: user.activeMembershipRole ?? 'user',
       content: dto.content,
       reactions: {},
     });
@@ -162,10 +162,10 @@ export class RepliesService {
       postId: new Types.ObjectId(postId),
     });
     if (!reply) throw new NotFoundException('Reply not found');
-    if (reply.residencyId !== user.residencyId) {
+    if (reply.clubId !== user.activeClubId) {
       throw new NotFoundException('Reply not found');
     }
-    if (String(reply.authorId) !== user.userId && user.role !== 'admin') {
+    if (String(reply.authorId) !== user.userId && user.activeMembershipRole !== 'admin') {
       throw new ForbiddenException('Cannot delete someone else\'s reply');
     }
 
@@ -195,7 +195,7 @@ export class RepliesService {
     const reply = await this.replyModel.findOne({
       _id: replyId,
       postId: new Types.ObjectId(postId),
-      residencyId: user.residencyId,
+      clubId: user.activeClubId,
     });
     if (!reply) throw new NotFoundException('Reply not found');
 

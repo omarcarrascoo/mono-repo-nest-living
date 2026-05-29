@@ -1,4 +1,7 @@
 export type Role = 'admin' | 'user' | 'kitchen_operator';
+export type GlobalRole = 'super_admin' | null;
+export type MembershipStatus = 'pending' | 'active' | 'rejected';
+export type ClubPrivacy = 'public' | 'private';
 
 export interface NotificationPreferences {
   reservationReminders: boolean;
@@ -10,27 +13,13 @@ export interface AuthUser {
   id: string;
   email: string;
   fullName: string;
-  role: Role;
-  residencyId: string;
+  globalRole: GlobalRole;
+  dateOfBirth?: string;
   status?: string;
   avatar?: string;
-  unitNumber?: string;
   timezone?: string;
   notificationPreferences?: NotificationPreferences;
-  stats?: {
-    balanceOwed?: number;
-    delinquencyRate?: number;
-    lastPaymentDate?: string;
-  };
-  lease?: {
-    startDate?: string;
-    endDate?: string;
-    rentAmount?: string;
-    securityDeposit?: string;
-    daysLeft?: number;
-  };
-  contacts?: any[];
-  documents?: any[];
+  favoriteAmenityIds?: string[];
 }
 
 export interface LoginRequest {
@@ -40,15 +29,93 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   access_token: string;
+  activeClubId: string | null;
+  activeMembershipRole: Role | null;
 }
 
 export interface RegisterRequest {
   fullName: string;
   email: string;
   password: string;
-  residencyId: string;
-  role?: Role;
+  dateOfBirth?: string;
+}
+
+export interface SwitchClubRequest {
+  clubId: string;
+}
+
+// ============================================================
+// Clubs + Memberships
+// ============================================================
+
+export interface Club {
+  id: string;
+  name: string;
+  description?: string;
+  joinCode?: string; // visible solo a admin/super_admin
+  privacy: ClubPrivacy;
+  status?: string;
+  createdAt?: string;
+}
+
+export interface Membership {
+  id: string;
+  userId: string;
+  clubId: string;
+  role: Role;
+  status: MembershipStatus;
   unitNumber?: string;
+  approvedAt?: string;
+  createdAt?: string;
+  /** Cuando viene desde GET /clubs/me/memberships, el club viene poblado. */
+  club?: Pick<Club, 'id' | 'name' | 'privacy'>;
+}
+
+export interface JoinClubRequest {
+  joinCode: string;
+  unitNumber?: string;
+}
+
+export interface JoinClubResponse {
+  status: MembershipStatus;
+  clubId: string;
+  membershipId: string;
+  club: { name: string; privacy: ClubPrivacy };
+}
+
+export interface CreateClubRequest {
+  name: string;
+  description?: string;
+  privacy?: ClubPrivacy;
+}
+
+export interface UpdateClubRequest {
+  name?: string;
+  description?: string;
+  privacy?: ClubPrivacy;
+  status?: string;
+}
+
+export interface PromoteAdminRequest {
+  userId: string;
+  unitNumber?: string;
+}
+
+export interface UpdateMembershipRequest {
+  role?: Role;
+  unitNumber?: string | null;
+}
+
+/** Item enriquecido devuelto por GET /clubs/:clubId/memberships (admin). */
+export interface ClubMember {
+  membershipId: string;
+  id: string; // userId
+  email: string;
+  fullName: string;
+  avatar?: string;
+  role: Role;
+  unitNumber?: string;
+  status: MembershipStatus;
 }
 
 export type AmenityStatus = 'available' | 'busy' | 'maintenance';
@@ -71,7 +138,7 @@ export interface WeeklySchedule {
 
 export interface Amenity {
   id: string;
-  residencyId: string;
+  clubId: string;
   categoryId?: string;
   title: string;
   description?: string;
@@ -96,7 +163,7 @@ export interface Amenity {
 
 export interface Category {
   id: string;
-  residencyId: string;
+  clubId: string;
   name: string;
   slug: string;
   icon: string;
@@ -115,7 +182,7 @@ export interface Reservation {
   amenityImage?: string;
   amenityLocation?: string;
   userId: string;
-  residencyId: string;
+  clubId: string;
   startTime: string; // ISO
   endTime: string;   // ISO
   status: ReservationStatus;
@@ -173,7 +240,7 @@ export interface FavoriteIdsResponse {
 
 export interface ProductCategory {
   id: string;
-  residencyId: string;
+  clubId: string;
   name: string;
   slug: string;
   icon: string;
@@ -211,7 +278,7 @@ export type ProductStatus = 'available' | 'sold_out' | 'hidden';
 
 export interface Product {
   id: string;
-  residencyId: string;
+  clubId: string;
   categoryId: string;
   name: string;
   description?: string;
@@ -293,7 +360,7 @@ export interface OrderStatusEvent {
 
 export interface Order {
   id: string;
-  residencyId: string;
+  clubId: string;
   userId: string;
   orderNumber: string;
   items: CartItem[];
@@ -386,7 +453,7 @@ export interface CommunityAuthor {
 
 export interface CommunityPost {
   id: string;
-  residencyId: string;
+  clubId: string;
   type: CommunityPostType;
   author: CommunityAuthor;
   tag?: string;
@@ -445,15 +512,6 @@ export interface CreateReplyRequest {
 // ============================================================
 // Admin
 // ============================================================
-
-export interface DirectoryUser {
-  id: string;
-  email: string;
-  fullName: string;
-  role: Role;
-  avatar?: string;
-  unitNumber?: string;
-}
 
 export interface AdminListReservationsParams {
   filter?: 'upcoming' | 'past' | 'cancelled' | 'all';

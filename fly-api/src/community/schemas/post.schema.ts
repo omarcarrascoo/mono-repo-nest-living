@@ -9,7 +9,7 @@ export type ReactionEmoji = (typeof REACTION_EMOJIS)[number];
 @Schema({ timestamps: true, collection: 'communityposts' })
 export class CommunityPost extends Document {
   @Prop({ required: true, index: true })
-  residencyId: string;
+  clubId: string;
 
   @Prop({
     required: true,
@@ -59,5 +59,5 @@ export class CommunityPost extends Document {
 
 export const CommunityPostSchema = SchemaFactory.createForClass(CommunityPost);
 
-CommunityPostSchema.index({ residencyId: 1, pinned: -1, createdAt: -1 });
-CommunityPostSchema.index({ residencyId: 1, type: 1, createdAt: -1 });
+CommunityPostSchema.index({ clubId: 1, pinned: -1, createdAt: -1 });
+CommunityPostSchema.index({ clubId: 1, type: 1, createdAt: -1 });

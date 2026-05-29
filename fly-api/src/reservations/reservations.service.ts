@@ -33,7 +33,7 @@ export interface ListReservationsOptions {
 }
 
 export interface AdminListReservationsOptions {
-  residencyId: string;
+  clubId: string;
   filter: 'upcoming' | 'past' | 'cancelled' | 'all';
   userId?: string;
   amenityId?: string;
@@ -69,7 +69,7 @@ export class ReservationsService {
 
   async getAvailability(
     amenityId: string,
-    residencyId: string,
+    clubId: string,
     dateStr: string,
   ): Promise<{
     amenityId: string;
@@ -78,7 +78,7 @@ export class ReservationsService {
     slots: AvailabilitySlot[];
   }> {
     const amenity = await this.amenityModel
-      .findOne({ _id: amenityId, residencyId })
+      .findOne({ _id: amenityId, clubId })
       .lean()
       .exec();
     if (!amenity) throw new NotFoundException('Amenity not found');
@@ -167,13 +167,13 @@ export class ReservationsService {
 
   async create(
     userId: string,
-    residencyId: string,
+    clubId: string,
     amenityId: string,
     startTimeIso: string,
     notes?: string,
   ) {
     const amenity = await this.amenityModel
-      .findOne({ _id: amenityId, residencyId })
+      .findOne({ _id: amenityId, clubId })
       .lean()
       .exec();
     if (!amenity) throw new NotFoundException('Amenity not found');
@@ -267,7 +267,7 @@ export class ReservationsService {
         const docs = await this.reservationModel.create(
           [
             {
-              residencyId,
+              clubId,
               amenityId: new Types.ObjectId(amenityId),
               userId: new Types.ObjectId(userId),
               startTime,
@@ -344,9 +344,9 @@ export class ReservationsService {
     return { items, nextCursor };
   }
 
-  async listForResidency(opts: AdminListReservationsOptions) {
-    const { residencyId, filter, limit, cursor, userId, amenityId } = opts;
-    const baseFilter: Record<string, any> = { residencyId };
+  async listForClub(opts: AdminListReservationsOptions) {
+    const { clubId, filter, limit, cursor, userId, amenityId } = opts;
+    const baseFilter: Record<string, any> = { clubId };
     if (userId) baseFilter.userId = new Types.ObjectId(userId);
     if (amenityId) baseFilter.amenityId = new Types.ObjectId(amenityId);
 
@@ -456,7 +456,7 @@ export class ReservationsService {
       // puede simplemente reservar el nuevo slot. Documentamos en el endpoint.
       created = await this.create(
         userId,
-        String(original.residencyId),
+        String(original.clubId),
         String(original.amenityId),
         newStartTimeIso,
         notes ?? original.notes,
@@ -468,17 +468,17 @@ export class ReservationsService {
   }
 
   /**
-   * Stats del dashboard admin. Todo scoped por residencyId. Las ventanas
+   * Stats del dashboard admin. Todo scoped por clubId. Las ventanas
    * "today/week/month" son ventanas relativas: últimas 24h / últimos 7 días /
    * últimos 30 días — no calendario natural, para que sea barato y predecible.
    */
-  async getAdminStats(residencyId: string) {
+  async getAdminStats(clubId: string) {
     const now = new Date();
     const dayAgo = new Date(now.getTime() - 24 * 3600 * 1000);
     const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
     const monthAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
 
-    const baseMatch = { residencyId };
+    const baseMatch = { clubId };
 
     const [counts, topAmenitiesAgg, hourAgg, totalForRate] = await Promise.all([
       this.reservationModel.aggregate([

@@ -13,7 +13,7 @@ export interface ListAmenitiesOptions {
   categoryId?: string;
   favoritesOnly?: boolean;
   userId: string;
-  residencyId: string;
+  clubId: string;
 }
 
 @Injectable()
@@ -28,7 +28,7 @@ export class AmenitiesService {
   }
 
   async list(opts: ListAmenitiesOptions) {
-    const filter: Record<string, any> = { residencyId: opts.residencyId };
+    const filter: Record<string, any> = { clubId: opts.clubId };
 
     if (opts.categoryId) {
       // Datos legacy podían guardar categoryId como string; los nuevos como ObjectId.
@@ -60,20 +60,20 @@ export class AmenitiesService {
       .exec();
   }
 
-  async findOne(id: string, residencyId: string) {
+  async findOne(id: string, clubId: string) {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Amenity not found');
     }
     const amenity = await this.amenityModel
-      .findOne({ _id: id, residencyId })
+      .findOne({ _id: id, clubId })
       .exec();
     if (!amenity) throw new NotFoundException('Amenity not found');
     return amenity;
   }
 
-  async update(id: string, residencyId: string, updateData: any) {
+  async update(id: string, clubId: string, updateData: any) {
     const updated = await this.amenityModel.findOneAndUpdate(
-      { _id: id, residencyId },
+      { _id: id, clubId },
       updateData,
       { new: true },
     );
@@ -83,8 +83,8 @@ export class AmenitiesService {
     return updated;
   }
 
-  async remove(id: string, residencyId: string) {
-    const result = await this.amenityModel.deleteOne({ _id: id, residencyId });
+  async remove(id: string, clubId: string) {
+    const result = await this.amenityModel.deleteOne({ _id: id, clubId });
     if (result.deletedCount === 0) {
       throw new ForbiddenException('Cannot delete amenity from another residency');
     }
@@ -94,11 +94,11 @@ export class AmenitiesService {
   async toggleFavorite(
     userId: string,
     amenityId: string,
-    residencyId: string,
+    clubId: string,
     favorite: boolean,
   ) {
     // Validamos que la amenidad exista en la residencia del usuario
-    await this.findOne(amenityId, residencyId);
+    await this.findOne(amenityId, clubId);
     return favorite
       ? this.usersService.addFavorite(userId, amenityId)
       : this.usersService.removeFavorite(userId, amenityId);

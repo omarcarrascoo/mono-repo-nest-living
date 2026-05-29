@@ -8,12 +8,17 @@ import {
   CartItem,
   CartItemModifier,
   Category,
+  Club,
+  ClubMember,
+  ClubPrivacy,
   CommunityAuthor,
   CommunityPost,
   CommunityPostType,
   CommunityReply,
-  DirectoryUser,
   FeaturedProduct,
+  GlobalRole,
+  Membership,
+  MembershipStatus,
   Notification,
   NotificationKind,
   Order,
@@ -36,7 +41,7 @@ type Raw = Record<string, any>;
 export function adaptAmenity(raw: Raw): Amenity {
   return {
     id: raw._id ?? raw.id,
-    residencyId: raw.residencyId,
+    clubId: raw.clubId,
     categoryId: raw.categoryId ? String(raw.categoryId) : undefined,
     title: raw.title ?? '',
     description: raw.description ?? '',
@@ -65,24 +70,82 @@ export function adaptAuthUser(raw: Raw): AuthUser {
     id: raw._id ?? raw.id,
     email: raw.email,
     fullName: raw.fullName,
-    role: raw.role,
-    residencyId: raw.residencyId,
+    globalRole: (raw.globalRole ?? null) as GlobalRole,
+    dateOfBirth: raw.dateOfBirth,
     status: raw.status,
     avatar: raw.avatar,
-    unitNumber: raw.unitNumber,
     timezone: raw.timezone,
     notificationPreferences: raw.notificationPreferences,
-    stats: raw.stats,
-    lease: raw.lease,
-    contacts: raw.contacts ?? [],
-    documents: raw.documents ?? [],
+    favoriteAmenityIds: Array.isArray(raw.favoriteAmenityIds)
+      ? raw.favoriteAmenityIds.map(String)
+      : [],
+  };
+}
+
+export function adaptClub(raw: Raw): Club {
+  return {
+    id: raw._id ?? raw.id,
+    name: raw.name ?? '',
+    description: raw.description,
+    joinCode: raw.joinCode,
+    privacy: (raw.privacy ?? 'public') as ClubPrivacy,
+    status: raw.status,
+    createdAt: raw.createdAt,
+  };
+}
+
+export function adaptMembership(raw: Raw): Membership {
+  // El backend popula `userId` (raw object) cuando hace falta — acá solo
+  // necesitamos el clubId resuelto y el club poblado si vino.
+  let clubId = '';
+  let club: Membership['club'];
+  if (raw.clubId && typeof raw.clubId === 'object') {
+    clubId = String(raw.clubId._id ?? raw.clubId.id ?? '');
+    club = {
+      id: clubId,
+      name: raw.clubId.name ?? '',
+      privacy: (raw.clubId.privacy ?? 'public') as ClubPrivacy,
+    };
+  } else {
+    clubId = String(raw.clubId ?? '');
+  }
+  return {
+    id: raw._id ?? raw.id,
+    userId: raw.userId ? String(raw.userId._id ?? raw.userId.id ?? raw.userId) : '',
+    clubId,
+    role: (raw.role ?? 'user') as Role,
+    status: (raw.status ?? 'pending') as MembershipStatus,
+    unitNumber: raw.unitNumber,
+    approvedAt: raw.approvedAt,
+    createdAt: raw.createdAt,
+    club,
+  };
+}
+
+/**
+ * Acepta dos shapes:
+ * - **Flat** (`GET /users/directory`): `{ membershipId, id, email, fullName, ... }`
+ * - **Anidado** (`GET /clubs/:clubId/memberships`): `{ id (=membershipId), role,
+ *   status, unitNumber, user: { id, fullName, email, avatar } }`
+ */
+export function adaptClubMember(raw: Raw): ClubMember {
+  const u = raw.user ?? {};
+  return {
+    membershipId: String(raw.membershipId ?? raw._id ?? raw.id ?? ''),
+    id: String(u.id ?? u._id ?? raw.userId ?? raw.id ?? ''),
+    email: raw.email ?? u.email ?? '',
+    fullName: raw.fullName ?? u.fullName ?? '',
+    avatar: raw.avatar ?? u.avatar,
+    role: (raw.role ?? 'user') as Role,
+    unitNumber: raw.unitNumber ?? undefined,
+    status: (raw.status ?? 'active') as MembershipStatus,
   };
 }
 
 export function adaptCategory(raw: Raw): Category {
   return {
     id: raw._id ?? raw.id,
-    residencyId: raw.residencyId,
+    clubId: raw.clubId,
     name: raw.name,
     slug: raw.slug,
     icon: raw.icon ?? 'grid',
@@ -115,7 +178,7 @@ export function adaptReservation(raw: Raw): Reservation {
     amenityImage: raw.amenityImage ?? amenityImage,
     amenityLocation: raw.amenityLocation ?? amenityLocation,
     userId: String(raw.userId ?? ''),
-    residencyId: raw.residencyId,
+    clubId: raw.clubId,
     startTime: raw.startTime,
     endTime: raw.endTime,
     status: (raw.status ?? 'confirmed') as ReservationStatus,
@@ -153,7 +216,7 @@ export function adaptAvailability(raw: Raw): AvailabilityResponse {
 export function adaptProductCategory(raw: Raw): ProductCategory {
   return {
     id: raw._id ?? raw.id,
-    residencyId: raw.residencyId,
+    clubId: raw.clubId,
     name: raw.name ?? '',
     slug: raw.slug ?? '',
     icon: raw.icon ?? 'package',
@@ -194,7 +257,7 @@ export function adaptProduct(raw: Raw): Product {
 
   return {
     id: raw._id ?? raw.id,
-    residencyId: raw.residencyId,
+    clubId: raw.clubId,
     categoryId,
     name: raw.name ?? '',
     description: raw.description,
@@ -267,7 +330,7 @@ function adaptOrderStatusEvent(raw: Raw): OrderStatusEvent {
 export function adaptOrder(raw: Raw): Order {
   return {
     id: raw._id ?? raw.id,
-    residencyId: raw.residencyId,
+    clubId: raw.clubId,
     userId: String(raw.userId ?? ''),
     orderNumber: raw.orderNumber ?? '',
     items: Array.isArray(raw.items) ? raw.items.map(adaptCartItem) : [],
@@ -335,7 +398,7 @@ export function adaptCommunityPost(
   const { summary, mine } = summarizeReactions(raw.reactions, currentUserId);
   return {
     id: raw._id ?? raw.id,
-    residencyId: raw.residencyId,
+    clubId: raw.clubId,
     type: (raw.type ?? 'post') as CommunityPostType,
     author: adaptCommunityAuthor(raw),
     tag: raw.tag,
@@ -390,17 +453,6 @@ export function adaptNotification(raw: Raw): Notification {
 // ============================================================
 // Admin
 // ============================================================
-
-export function adaptDirectoryUser(raw: Raw): DirectoryUser {
-  return {
-    id: String(raw._id ?? raw.id ?? ''),
-    email: raw.email ?? '',
-    fullName: raw.fullName ?? '',
-    role: (raw.role ?? 'user') as Role,
-    avatar: raw.avatar,
-    unitNumber: raw.unitNumber,
-  };
-}
 
 export function adaptAdminReservation(raw: Raw): AdminReservation {
   const base = adaptReservation(raw);

@@ -21,6 +21,30 @@ import { Feather } from '@expo/vector-icons';
 import { COLORS, GRADIENTS } from '@/constants/theme';
 import { useAuthStore } from '@/stores/auth-store';
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function formatDOBInput(input: string): string {
+  // Allow only digits, auto-insert dashes after 4 and 7 chars: YYYY-MM-DD.
+  const digits = input.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
+function isAdult(iso: string): boolean {
+  if (!ISO_DATE_RE.test(iso)) return false;
+  const [y, m, d] = iso.split('-').map(Number);
+  const dob = new Date(y, m - 1, d);
+  if (Number.isNaN(dob.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+  return age >= 13 && age < 120;
+}
+
 export default function RegisterScreen() {
   const router = useRouter();
   const register = useAuthStore((s) => s.register);
@@ -28,10 +52,11 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [residencyId, setResidencyId] = useState('');
-  const [unitNumber, setUnitNumber] = useState('');
+  const [dob, setDob] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const dobValid = useMemo(() => dob === '' || isAdult(dob), [dob]);
 
   const disabled = useMemo(
     () =>
@@ -39,8 +64,8 @@ export default function RegisterScreen() {
       !fullName.trim() ||
       !email.trim() ||
       password.length < 6 ||
-      !residencyId.trim(),
-    [loading, fullName, email, password, residencyId],
+      !dobValid,
+    [loading, fullName, email, password, dobValid],
   );
 
   async function handleSubmit() {
@@ -52,10 +77,11 @@ export default function RegisterScreen() {
         fullName: fullName.trim(),
         email: email.trim(),
         password,
-        residencyId: residencyId.trim(),
-        unitNumber: unitNumber.trim() || undefined,
+        dateOfBirth: dob.trim() ? dob.trim() : undefined,
       });
-      router.replace('/(tabs)');
+      // Tras registro+login: si el user no tiene clubs, lo mandamos al join screen.
+      // El _layout decide la navegación apropiada según activeClubId.
+      router.replace('/clubs/join');
     } catch (e: any) {
       Alert.alert(
         'No pudimos crear la cuenta',
@@ -86,7 +112,7 @@ export default function RegisterScreen() {
           <View style={styles.header}>
             <Text style={styles.title}>Crea tu cuenta</Text>
             <Text style={styles.subtitle}>
-              Solo unos datos para entrar a tu comunidad.
+              Solo unos datos. Después te unes a tu club con un código.
             </Text>
           </View>
 
@@ -122,18 +148,23 @@ export default function RegisterScreen() {
             }
           />
           <Field
-            icon="home"
-            placeholder="ID de tu residencia"
-            value={residencyId}
-            onChangeText={setResidencyId}
+            icon="calendar"
+            placeholder="Fecha de nacimiento (YYYY-MM-DD)"
+            value={dob}
+            onChangeText={(v) => setDob(formatDOBInput(v))}
+            keyboardType="number-pad"
             autoCapitalize="none"
+            invalid={!dobValid}
           />
-          <Field
-            icon="hash"
-            placeholder="Número de unidad (opcional)"
-            value={unitNumber}
-            onChangeText={setUnitNumber}
-          />
+          {!dobValid ? (
+            <Text style={styles.helperError}>
+              Fecha inválida o demasiado joven (mín. 13 años).
+            </Text>
+          ) : (
+            <Text style={styles.helper}>
+              Opcional. Algunos clubs lo piden para verificar tu identidad.
+            </Text>
+          )}
 
           <TouchableOpacity
             onPress={handleSubmit}
@@ -176,6 +207,7 @@ interface FieldProps {
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   right?: React.ReactNode;
+  invalid?: boolean;
 }
 
 function Field({
@@ -187,19 +219,34 @@ function Field({
   keyboardType,
   autoCapitalize,
   right,
+  invalid,
 }: FieldProps) {
   const [focused, setFocused] = useState(false);
+  const borderColor = invalid
+    ? '#ef4444'
+    : focused
+      ? COLORS.brand.teal
+      : '#E2E8F0';
   return (
     <View
       style={[
         styles.input,
-        focused && { borderColor: COLORS.brand.teal, backgroundColor: '#fff' },
+        {
+          borderColor,
+          backgroundColor: focused || invalid ? '#fff' : '#F8FAFC',
+        },
       ]}
     >
       <Feather
         name={icon}
         size={20}
-        color={focused ? COLORS.brand.teal : COLORS.text.label}
+        color={
+          invalid
+            ? '#ef4444'
+            : focused
+              ? COLORS.brand.teal
+              : COLORS.text.label
+        }
         style={{ marginRight: 14 }}
       />
       <TextInput
@@ -247,12 +294,10 @@ const styles = StyleSheet.create({
   input: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
     height: 56,
     borderRadius: 16,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
     marginBottom: 14,
   },
   inputText: {
@@ -261,6 +306,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.light.textPrimary,
     fontWeight: '500',
+  },
+  helper: {
+    color: COLORS.light.textSecondary,
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 14,
+    paddingHorizontal: 4,
+  },
+  helperError: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 14,
+    paddingHorizontal: 4,
+    fontWeight: '600',
   },
   btn: {
     marginTop: 16,
