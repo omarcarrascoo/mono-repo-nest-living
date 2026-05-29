@@ -145,6 +145,7 @@ export function AdminProductsManager({ visible, onClose }: AdminProductsManagerP
           setEditing(null);
           await refresh();
         }}
+        onCategoriesChanged={setCategories}
       />
     </Modal>
   );
@@ -200,9 +201,27 @@ interface ProductFormProps {
   categories: ProductCategory[];
   onClose: () => void;
   onSaved: () => void;
+  onCategoriesChanged: (categories: ProductCategory[]) => void;
 }
 
-function ProductForm({ visible, product, categories, onClose, onSaved }: ProductFormProps) {
+function slugify(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip accents
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+function ProductForm({
+  visible,
+  product,
+  categories,
+  onClose,
+  onSaved,
+  onCategoriesChanged,
+}: ProductFormProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
@@ -212,6 +231,11 @@ function ProductForm({ visible, product, categories, onClose, onSaved }: Product
   const [featured, setFeatured] = useState(false);
   const [prepTime, setPrepTime] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Crear categoría inline
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -223,8 +247,55 @@ function ProductForm({ visible, product, categories, onClose, onSaved }: Product
       setCategoryId(product?.categoryId ?? null);
       setFeatured(!!product?.featured);
       setPrepTime(product?.prepTime ?? '');
+      setCreatingCategory(false);
+      setNewCategoryName('');
     }
   }, [visible, product]);
+
+  const handleCreateCategory = async () => {
+    const trimmed = newCategoryName.trim();
+    if (trimmed.length < 1) {
+      Alert.alert('Falta el nombre', 'Dale un nombre a la categoría.');
+      return;
+    }
+    const slug = slugify(trimmed);
+    if (!slug) {
+      Alert.alert(
+        'Nombre inválido',
+        'Usa letras o números — el slug interno no se pudo generar.',
+      );
+      return;
+    }
+    if (categories.some((c) => c.slug === slug)) {
+      Alert.alert(
+        'Categoría duplicada',
+        'Ya existe una categoría con ese nombre. Selecciónala de la lista.',
+      );
+      return;
+    }
+    setSavingCategory(true);
+    try {
+      const created = await adminService.createProductCategory({
+        name: trimmed,
+        slug,
+        icon: 'package',
+      });
+      const next = [...categories, created].sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+      );
+      onCategoriesChanged(next);
+      setCategoryId(created.id);
+      setCreatingCategory(false);
+      setNewCategoryName('');
+    } catch (e: any) {
+      Alert.alert(
+        'No se pudo crear',
+        e?.message ?? 'Intenta con otro nombre.',
+      );
+    } finally {
+      setSavingCategory(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -370,31 +441,90 @@ function ProductForm({ visible, product, categories, onClose, onSaved }: Product
             </View>
           </FormField>
 
-          {categories.length > 0 ? (
-            <FormField label="Categoría *">
-              <View style={styles.categoryRow}>
-                {categories.map((c) => {
-                  const active = categoryId === c.id;
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      onPress={() => setCategoryId(c.id)}
-                      style={[styles.categoryChip, active && styles.categoryChipActive]}
+          <FormField label="Categoría *">
+            <View style={styles.categoryRow}>
+              {categories.map((c) => {
+                const active = categoryId === c.id;
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    onPress={() => setCategoryId(c.id)}
+                    style={[styles.categoryChip, active && styles.categoryChipActive]}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        active && styles.categoryChipTextActive,
+                      ]}
                     >
-                      <Text
-                        style={[
-                          styles.categoryChipText,
-                          active && styles.categoryChipTextActive,
-                        ]}
-                      >
-                        {c.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                      {c.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {!creatingCategory ? (
+                <TouchableOpacity
+                  style={styles.newCategoryChip}
+                  onPress={() => setCreatingCategory(true)}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="plus" size={14} color={COLORS.brand.tealDark} />
+                  <Text style={styles.newCategoryChipText}>Nueva</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {creatingCategory ? (
+              <View style={styles.newCategoryBox}>
+                <View style={styles.newCategoryRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    placeholder="Ej. Bebidas, Postres…"
+                    placeholderTextColor={COLORS.text.label}
+                    value={newCategoryName}
+                    onChangeText={setNewCategoryName}
+                    autoFocus
+                    maxLength={60}
+                  />
+                  <TouchableOpacity
+                    onPress={handleCreateCategory}
+                    disabled={savingCategory}
+                    style={[styles.newCategoryBtn, savingCategory && { opacity: 0.6 }]}
+                    activeOpacity={0.85}
+                  >
+                    {savingCategory ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Feather name="check" size={16} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setCreatingCategory(false);
+                      setNewCategoryName('');
+                    }}
+                    disabled={savingCategory}
+                    style={styles.newCategoryCancelBtn}
+                    activeOpacity={0.85}
+                  >
+                    <Feather name="x" size={16} color={COLORS.text.label} />
+                  </TouchableOpacity>
+                </View>
+                {newCategoryName.trim() ? (
+                  <Text style={styles.newCategoryHint}>
+                    Se guardará como “{newCategoryName.trim()}” (slug:{' '}
+                    {slugify(newCategoryName.trim())})
+                  </Text>
+                ) : null}
               </View>
-            </FormField>
-          ) : null}
+            ) : null}
+
+            {categories.length === 0 && !creatingCategory ? (
+              <Text style={styles.newCategoryHint}>
+                Aún no tienes categorías. Toca “Nueva” para crear la primera.
+              </Text>
+            ) : null}
+          </FormField>
 
           <TouchableOpacity
             style={styles.featuredToggle}
@@ -611,6 +741,56 @@ const styles = StyleSheet.create({
   categoryChipActive: { backgroundColor: COLORS.brand.tealDark, borderColor: COLORS.brand.tealDark },
   categoryChipText: { fontSize: 12, fontWeight: '600', color: COLORS.text.primary },
   categoryChipTextActive: { color: '#fff' },
+
+  newCategoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#ccfbf1',
+    borderWidth: 1,
+    borderColor: COLORS.brand.tealDark,
+    borderStyle: 'dashed',
+  },
+  newCategoryChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.brand.tealDark,
+  },
+  newCategoryBox: {
+    marginTop: 12,
+    gap: 8,
+  },
+  newCategoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  newCategoryBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: COLORS.brand.tealDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newCategoryCancelBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: COLORS.light.card,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newCategoryHint: {
+    fontSize: 12,
+    color: COLORS.text.label,
+    paddingHorizontal: 4,
+  },
 
   featuredToggle: {
     flexDirection: 'row',

@@ -16,7 +16,7 @@ import {
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
-import { Amenity, AmenityStatus } from '@/types/api';
+import { Amenity, AmenityStatus, DaySchedule, WeeklySchedule } from '@/types/api';
 import { useAmenitiesStore } from '@/stores/amenities-store';
 import { useCategoriesStore } from '@/stores/categories-store';
 import { adminService } from '@/services/admin.service';
@@ -195,6 +195,56 @@ interface AmenityFormProps {
   onSaved: () => void;
 }
 
+type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+const DAYS: { key: DayKey; label: string; short: string }[] = [
+  { key: 'mon', label: 'Lunes', short: 'L' },
+  { key: 'tue', label: 'Martes', short: 'M' },
+  { key: 'wed', label: 'Miércoles', short: 'X' },
+  { key: 'thu', label: 'Jueves', short: 'J' },
+  { key: 'fri', label: 'Viernes', short: 'V' },
+  { key: 'sat', label: 'Sábado', short: 'S' },
+  { key: 'sun', label: 'Domingo', short: 'D' },
+];
+
+const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function defaultDay(): DaySchedule {
+  return { open: '08:00', close: '22:00', closed: false };
+}
+
+function defaultSchedule(): WeeklySchedule {
+  return {
+    mon: defaultDay(),
+    tue: defaultDay(),
+    wed: defaultDay(),
+    thu: defaultDay(),
+    fri: defaultDay(),
+    sat: defaultDay(),
+    sun: defaultDay(),
+  };
+}
+
+/** Auto-formato del input al teclear: "1234" → "12:34", "9" → "9", "9:" mantiene. */
+function formatTimeInput(input: string): string {
+  const digits = input.replace(/\D/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+/** Devuelve true si todos los días tienen el mismo horario (incluyendo `closed`). */
+function isUniformSchedule(s: WeeklySchedule): boolean {
+  const ref = s.mon;
+  return DAYS.every(({ key }) => {
+    const d = s[key];
+    return (
+      d.open === ref.open &&
+      d.close === ref.close &&
+      d.closed === ref.closed
+    );
+  });
+}
+
 function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
   const categories = useCategoriesStore((s) => s.items);
   const fetchCategories = useCategoriesStore((s) => s.fetchAll);
@@ -206,6 +256,8 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
   const [status, setStatus] = useState<AmenityStatus>('available');
   const [capacity, setCapacity] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<WeeklySchedule>(defaultSchedule);
+  const [scheduleMode, setScheduleMode] = useState<'uniform' | 'custom'>('uniform');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -223,12 +275,48 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
       setStatus(amenity?.status ?? 'available');
       setCapacity(amenity?.capacity ? String(amenity.capacity) : '');
       setCategoryId(amenity?.categoryId ?? null);
+      const initial = amenity?.schedule ?? defaultSchedule();
+      setSchedule(initial);
+      setScheduleMode(isUniformSchedule(initial) ? 'uniform' : 'custom');
     }
   }, [visible, amenity]);
+
+  const updateDay = (day: DayKey, patch: Partial<DaySchedule>) => {
+    setSchedule((prev) => ({ ...prev, [day]: { ...prev[day], ...patch } }));
+  };
+
+  const updateAllDays = (patch: Partial<DaySchedule>) => {
+    setSchedule((prev) => {
+      const next = { ...prev };
+      for (const { key } of DAYS) {
+        next[key] = { ...next[key], ...patch };
+      }
+      return next;
+    });
+  };
+
+  const validateSchedule = (s: WeeklySchedule): string | null => {
+    for (const { key, label } of DAYS) {
+      const d = s[key];
+      if (d.closed) continue;
+      if (!HHMM_RE.test(d.open) || !HHMM_RE.test(d.close)) {
+        return `${label}: usa el formato HH:mm (ej. 08:00).`;
+      }
+      if (d.open >= d.close) {
+        return `${label}: la hora de cierre debe ser mayor a la de apertura.`;
+      }
+    }
+    return null;
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
       Alert.alert('Falta el título', 'Por favor da un nombre a la amenidad.');
+      return;
+    }
+    const scheduleError = validateSchedule(schedule);
+    if (scheduleError) {
+      Alert.alert('Horario inválido', scheduleError);
       return;
     }
     setSaving(true);
@@ -239,6 +327,7 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
         location: location.trim(),
         image: image.trim(),
         status,
+        schedule,
       };
       if (capacity.trim()) {
         const n = Number(capacity.trim());
@@ -334,6 +423,161 @@ function AmenityForm({ visible, amenity, onClose, onSaved }: AmenityFormProps) {
             />
           </FormField>
 
+          <FormField label="Horario">
+            <View style={styles.scheduleModeRow}>
+              <TouchableOpacity
+                style={[
+                  styles.scheduleModeBtn,
+                  scheduleMode === 'uniform' && styles.scheduleModeBtnActive,
+                ]}
+                onPress={() => {
+                  // Al cambiar a uniform, copia mon a todos los días para que
+                  // el toggle no pierda info inadvertidamente.
+                  if (scheduleMode !== 'uniform') {
+                    updateAllDays(schedule.mon);
+                  }
+                  setScheduleMode('uniform');
+                }}
+                activeOpacity={0.85}
+              >
+                <Feather
+                  name="clock"
+                  size={14}
+                  color={
+                    scheduleMode === 'uniform' ? '#fff' : COLORS.text.primary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.scheduleModeText,
+                    scheduleMode === 'uniform' && styles.scheduleModeTextActive,
+                  ]}
+                >
+                  Mismo horario todos los días
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.scheduleModeBtn,
+                  scheduleMode === 'custom' && styles.scheduleModeBtnActive,
+                ]}
+                onPress={() => setScheduleMode('custom')}
+                activeOpacity={0.85}
+              >
+                <Feather
+                  name="calendar"
+                  size={14}
+                  color={
+                    scheduleMode === 'custom' ? '#fff' : COLORS.text.primary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.scheduleModeText,
+                    scheduleMode === 'custom' && styles.scheduleModeTextActive,
+                  ]}
+                >
+                  Por día
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {scheduleMode === 'uniform' ? (
+              <View style={styles.uniformRow}>
+                <TimeInput
+                  label="Abre"
+                  value={schedule.mon.open}
+                  onChangeText={(v) =>
+                    updateAllDays({ open: formatTimeInput(v) })
+                  }
+                />
+                <Feather name="arrow-right" size={16} color={COLORS.text.label} />
+                <TimeInput
+                  label="Cierra"
+                  value={schedule.mon.close}
+                  onChangeText={(v) =>
+                    updateAllDays({ close: formatTimeInput(v) })
+                  }
+                />
+              </View>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {DAYS.map(({ key, label }) => {
+                  const d = schedule[key];
+                  return (
+                    <View
+                      key={key}
+                      style={[
+                        styles.dayRow,
+                        d.closed && styles.dayRowClosed,
+                      ]}
+                    >
+                      <View style={styles.dayHeader}>
+                        <Text style={styles.dayLabel}>{label}</Text>
+                        <TouchableOpacity
+                          onPress={() => updateDay(key, { closed: !d.closed })}
+                          style={[
+                            styles.openClosedToggle,
+                            d.closed && styles.openClosedToggleClosed,
+                          ]}
+                          activeOpacity={0.85}
+                        >
+                          <Text
+                            style={[
+                              styles.openClosedToggleText,
+                              d.closed && styles.openClosedToggleTextClosed,
+                            ]}
+                          >
+                            {d.closed ? 'Cerrado' : 'Abierto'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      {!d.closed ? (
+                        <View style={styles.dayTimeRow}>
+                          <TimeInput
+                            label="Abre"
+                            value={d.open}
+                            onChangeText={(v) =>
+                              updateDay(key, { open: formatTimeInput(v) })
+                            }
+                          />
+                          <Feather
+                            name="arrow-right"
+                            size={14}
+                            color={COLORS.text.label}
+                          />
+                          <TimeInput
+                            label="Cierra"
+                            value={d.close}
+                            onChangeText={(v) =>
+                              updateDay(key, { close: formatTimeInput(v) })
+                            }
+                          />
+                          <TouchableOpacity
+                            onPress={() => updateAllDays({ ...d })}
+                            style={styles.applyAllBtn}
+                            activeOpacity={0.85}
+                            hitSlop={6}
+                          >
+                            <Feather
+                              name="copy"
+                              size={14}
+                              color={COLORS.brand.tealDark}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+                <Text style={styles.scheduleHint}>
+                  Toca el icono de copiar (📋) para aplicar el horario de un día
+                  a toda la semana.
+                </Text>
+              </View>
+            )}
+          </FormField>
+
           <FormField label="Estado">
             <View style={styles.statusRow}>
               {STATUS_OPTIONS.map((opt) => {
@@ -414,6 +658,35 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
       {children}
+    </View>
+  );
+}
+
+function TimeInput({
+  label,
+  value,
+  onChangeText,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+}) {
+  const valid = value === '' || HHMM_RE.test(value);
+  return (
+    <View style={styles.timeInputBox}>
+      <Text style={styles.timeInputLabel}>{label}</Text>
+      <TextInput
+        style={[
+          styles.timeInput,
+          !valid && { borderColor: '#ef4444', color: '#ef4444' },
+        ]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder="08:00"
+        placeholderTextColor={COLORS.text.label}
+        keyboardType="number-pad"
+        maxLength={5}
+      />
     </View>
   );
 }
@@ -568,6 +841,129 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 84, textAlignVertical: 'top' },
 
   statusRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+
+  scheduleModeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+  },
+  scheduleModeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.light.card,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+  },
+  scheduleModeBtnActive: {
+    backgroundColor: COLORS.brand.tealDark,
+    borderColor: COLORS.brand.tealDark,
+  },
+  scheduleModeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.text.primary,
+  },
+  scheduleModeTextActive: { color: '#fff' },
+
+  uniformRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    marginTop: 8,
+  },
+  timeInputBox: { flex: 1, gap: 4 },
+  timeInputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.text.label,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  timeInput: {
+    backgroundColor: COLORS.light.card,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    color: COLORS.text.primary,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+
+  dayRow: {
+    backgroundColor: COLORS.light.card,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.light.border,
+    gap: 10,
+  },
+  dayRowClosed: {
+    opacity: 0.7,
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dayLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.text.primary,
+  },
+  openClosedToggle: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#16a34a',
+  },
+  openClosedToggleClosed: {
+    backgroundColor: '#fee2e2',
+    borderColor: '#dc2626',
+  },
+  openClosedToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#15803d',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  openClosedToggleTextClosed: { color: '#b91c1c' },
+  dayTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  applyAllBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#ccfbf1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.brand.tealDark,
+    marginBottom: 0,
+  },
+  scheduleHint: {
+    fontSize: 11,
+    color: COLORS.text.label,
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
+
   statusChip: {
     paddingHorizontal: 12,
     paddingVertical: 8,
