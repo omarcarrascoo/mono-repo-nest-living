@@ -8,6 +8,7 @@ import { TransactionList } from '@/components/wallet/TransactionList';
 import { COLORS } from '@/constants/theme';
 import { useNotificationsStore } from '@/stores/notifications-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useUnreadBadge } from '@/hooks/use-unread-badge';
 
 // Mock Data (Can be moved to a service later)
 const NEXT_PAYMENT = {
@@ -28,12 +29,8 @@ const TRANSACTIONS = [
 export default function SplitSheetWallet() {
   const router = useRouter();
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
-  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
   const user = useAuthStore((s) => s.user);
-
-  useEffect(() => {
-    void fetchUnreadCount();
-  }, [fetchUnreadCount]);
+  useUnreadBadge();
 
   return (
     <View style={styles.container}>

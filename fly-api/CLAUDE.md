@@ -214,20 +214,43 @@ npm run start        # plain
 npm run build        # → dist/
 npm run start:prod   # node dist/main
 npm test             # jest
+
+npm run seed:demo         # pobla un club demo (idempotente)
+npm run seed:demo:reset   # borra el club demo previo y vuelve a poblar
 ```
+
+### Seed de demo
+
+`scripts/seed-demo.ts` usa schemas planos de Mongoose (no los decorados de
+Nest, porque `tsx` no procesa `emitDecoratorMetadata`) y poblará:
+
+- 1 super_admin global + 1 admin de club + 4 residentes activos + 1 residente
+  pending (para probar el flujo de aprobación) + 1 kitchen_operator
+- Club `Residencial Las Palmas` con `joinCode=PALMAS25`, privacy=public
+- 5 categorías de amenidad + 6 amenidades con horarios completos
+- ~17 reservas mezcladas (futuras confirmadas, pasadas completadas, canceladas)
+- 4 categorías de delivery + 12 productos (uno destacado, uno sold_out)
+- 10 pedidos en todos los estados (`pending` → `delivered` + cancelled)
+- 8 posts de comunidad (anuncios pinned + posts de residentes)
+
+Todas las cuentas usan password `password123`. Ver el log final del seed para
+el resumen.
 
 ## Smoke test
 
 ```bash
-# 1. Health
-curl http://localhost:3000/
+# Cambia API a tu local si lo prefieres
+API="${API:-https://mono-repo-nest-living.onrender.com}"
 
-# 2. Login
-TOKEN=$(curl -s -X POST http://localhost:3000/auth/login \
+# 1. Health
+curl "$API/"
+
+# 2. Login (usa una cuenta del seed demo, o crea una con /auth/register)
+TOKEN=$(curl -s -X POST "$API/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"password123"}' \
+  -d '{"email":"admin@palmas.demo","password":"password123"}' \
   | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).access_token))")
 
 # 3. /users/me
-curl http://localhost:3000/users/me -H "Authorization: Bearer $TOKEN"
+curl "$API/users/me" -H "Authorization: Bearer $TOKEN"
 ```

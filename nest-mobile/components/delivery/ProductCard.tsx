@@ -34,7 +34,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       onPress={onPress}
     >
       <View style={styles.imageWrap}>
-        <Image source={{ uri: product.image }} style={styles.image} />
+        <Image
+          source={product.image ? { uri: product.image } : undefined}
+          style={styles.image}
+        />
         {hasOffer ? (
           <View style={styles.offerBadge}>
             <Text style={styles.offerText}>OFERTA</Text>

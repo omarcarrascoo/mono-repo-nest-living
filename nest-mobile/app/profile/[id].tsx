@@ -217,13 +217,21 @@ export default function UserProfileScreen() {
       {
         text: 'Cerrar sesión',
         style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/');
-        },
+        // No navegamos manualmente — el AuthGate detecta status='unauthenticated'
+        // y manda al login. Así evitamos "navigate before mounting" cuando esta
+        // pantalla se desmonta antes de que router.replace() ejecute.
+        onPress: () => void logout(),
       },
     ]);
   };
+
+  // Importante: TODOS los hooks deben correr antes de cualquier early-return,
+  // si no React lanza "Rendered fewer hooks than expected" cuando logout()
+  // pone el user en null y se desmonta este árbol.
+  const dobLabel = useMemo(() => {
+    if (!user?.dateOfBirth) return 'Sin registrar';
+    return user.dateOfBirth;
+  }, [user?.dateOfBirth]);
 
   if (!user) {
     return (
@@ -235,10 +243,6 @@ export default function UserProfileScreen() {
   }
 
   const profile = toProfile(user, activeMembership?.unitNumber);
-  const dobLabel = useMemo(() => {
-    if (!user.dateOfBirth) return 'Sin registrar';
-    return user.dateOfBirth;
-  }, [user.dateOfBirth]);
 
   return (
     <View style={styles.container}>

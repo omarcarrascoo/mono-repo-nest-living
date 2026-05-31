@@ -69,6 +69,24 @@ const KIND_META: Record<
     bg: '#e0f2fe',
     label: 'Cocina',
   },
+  community_announcement: {
+    icon: 'volume-2',
+    tint: COLORS.brand.tealDark,
+    bg: COLORS.promotions.pillBg,
+    label: 'Aviso del club',
+  },
+  community_post_reply: {
+    icon: 'message-circle',
+    tint: COLORS.brand.tealDark,
+    bg: COLORS.promotions.pillBg,
+    label: 'Respuesta',
+  },
+  community_reply_reply: {
+    icon: 'corner-down-right',
+    tint: COLORS.brand.tealDark,
+    bg: COLORS.promotions.pillBg,
+    label: 'Mención',
+  },
 };
 
 function formatRelative(iso: string): string {
@@ -85,15 +103,9 @@ function formatRelative(iso: string): string {
   return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
 }
 
-function getOrderId(n: Notification): string | null {
+function getDataString(n: Notification, key: string): string | null {
   if (!n.data) return null;
-  const v = (n.data as Record<string, unknown>).orderId;
-  return typeof v === 'string' && v.length > 0 ? v : null;
-}
-
-function getReservationId(n: Notification): string | null {
-  if (!n.data) return null;
-  const v = (n.data as Record<string, unknown>).reservationId;
+  const v = (n.data as Record<string, unknown>)[key];
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 
@@ -115,14 +127,18 @@ export default function NotificationsScreen() {
 
   const handlePress = async (n: Notification) => {
     if (!n.read) void markRead(n.id);
-    const orderId = getOrderId(n);
-    if (orderId) {
-      router.push(`/orders/${orderId}` as never);
-      return;
-    }
-    const reservationId = getReservationId(n);
+    const reservationId = getDataString(n, 'reservationId');
+    const orderId = getDataString(n, 'orderId');
+    const postId = getDataString(n, 'postId');
+    const amenityId = getDataString(n, 'amenityId');
     if (reservationId) {
       router.push(`/reservation/${reservationId}` as never);
+    } else if (orderId) {
+      router.push(`/orders/${orderId}` as never);
+    } else if (postId) {
+      router.push(`/post/${postId}` as never);
+    } else if (amenityId) {
+      router.push(`/amenity/${amenityId}` as never);
     }
   };
 

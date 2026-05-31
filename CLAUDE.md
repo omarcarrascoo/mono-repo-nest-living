@@ -1,23 +1,27 @@
 # NestQuest — mono-repo-nest-living
 
-Monorepo informal con dos apps que se hablan entre sí.
+Monorepo informal con tres apps que se hablan entre sí.
 
 ## Estructura
 
 ```
 mono-repo-nest-living/
 ├── fly-api/             # Backend NestJS 11 + MongoDB Atlas + JWT (Passport)
-├── nest-mobile/         # App Expo 54 / React Native 0.81 + expo-router + Zustand
+├── nest-mobile/         # App Expo 54 / React Native 0.81 + expo-router + Zustand (residentes)
+├── nest-admin-web/      # Sitio Next.js 16 + React 19 + Tailwind v4 + Zustand (administradores)
 └── postmans-endpoints/  # Fuente de verdad de los endpoints del backend (Postman v2.1)
 ```
 
-Cada app tiene su propio `CLAUDE.md` con reglas específicas:
+Cada app tiene su propio `CLAUDE.md` / `AGENTS.md` con reglas específicas:
 - `fly-api/CLAUDE.md` — reglas de backend, **incluyendo la regla de sincronización con Postman**.
-- `nest-mobile/CLAUDE.md` — reglas de frontend (si existe).
+- `nest-mobile/CLAUDE.md` — reglas de frontend móvil (si existe).
+- `nest-admin-web/AGENTS.md` — reglas del sitio admin (Next 16, React 19, cómo portar módulos).
+
+`nest-mobile` y `nest-admin-web` consumen el **mismo backend** y comparten contrato: cliente `apiFetch` (Bearer + auto-logout 401), tipos en `types/api.ts` y adapters `_id→id`. Al tocar la capa de datos, mantén ambos clientes alineados.
 
 ## Cómo se conectan
 
-- El frontend resuelve `API_URL` en `nest-mobile/lib/env.ts` y apunta por default a `http://localhost:3000` en dev.
+- El frontend resuelve `API_URL` en `nest-mobile/lib/env.ts` y apunta por default al deploy en Render (`https://mono-repo-nest-living.onrender.com`). Override con `EXPO_PUBLIC_API_URL` en `nest-mobile/.env` para apuntar a un backend local. El admin web hace lo equivalente vía `NEXT_PUBLIC_API_URL` en `nest-admin-web/.env.local`.
 - Auth: el backend devuelve `{ access_token }` en `POST /auth/login`. El frontend lo guarda con `expo-secure-store` (nativo) / `localStorage` (web) y lo manda en cada request vía `apiFetch` (`nest-mobile/lib/api/client.ts`).
 - Multitenancy por **club**: cada user puede pertenecer a varios clubs (Membership join table), pero el JWT trae **un solo** `activeClubId` por sesión. El backend lo lee del JWT y filtra todos los recursos. El frontend nunca lo manda en el body. Para cambiar de club activo, el frontend llama `POST /auth/switch-club` que re-emite el JWT.
 - Errores 401 disparan `logout()` automático en el cliente vía un callback registrado en `auth-store`.

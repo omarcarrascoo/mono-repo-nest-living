@@ -23,7 +23,9 @@ export function configurePushHandler() {
       shouldShowBanner: true,
       shouldShowList: true,
       shouldPlaySound: true,
-      shouldSetBadge: false,
+      // Deja que iOS incremente el badge automáticamente; el store reconcilia
+      // con el conteo real cuando el user abre la app.
+      shouldSetBadge: true,
     } as any),
   });
 }

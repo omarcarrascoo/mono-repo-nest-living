@@ -23,6 +23,7 @@ import { PromoCategory, PromoDeal } from '@/types/promotions';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
 import { useNotificationsStore } from '@/stores/notifications-store';
 import { useAuthStore } from '@/stores/auth-store';
+import { useUnreadBadge } from '@/hooks/use-unread-badge';
 
 // --- MOCK DATA ---
 const CATEGORIES: PromoCategory[] = [
@@ -72,12 +73,8 @@ export default function PromotionsScreen() {
   const [activeCategory, setActiveCategory] = useState('all');
 
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
-  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
   const user = useAuthStore((s) => s.user);
-
-  useEffect(() => {
-    void fetchUnreadCount();
-  }, [fetchUnreadCount]);
+  useUnreadBadge();
 
   return (
     <View style={styles.container}>

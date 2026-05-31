@@ -17,6 +17,7 @@ import { ToggleRow } from '@/components/ui/ToggleRow';
 import { COLORS } from '@/constants/theme';
 import { DashboardHeader } from '@/components/ui/DashboardHeader';
 import { useNotificationsStore } from '@/stores/notifications-store';
+import { useUnreadBadge } from '@/hooks/use-unread-badge';
 import { useCommunityStore, CommunityFilter } from '@/stores/community-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { PostComposerTrigger } from '@/components/community/PostComposerTrigger';
@@ -49,7 +50,7 @@ export default function FeedUnifiedScreen() {
   const deletePost = useCommunityStore((s) => s.deletePost);
 
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
-  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+  useUnreadBadge();
 
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -73,9 +74,8 @@ export default function FeedUnifiedScreen() {
   }, [items]);
 
   useEffect(() => {
-    void fetchUnreadCount();
     void fetchPosts();
-  }, [fetchUnreadCount, fetchPosts]);
+  }, [fetchPosts]);
 
   const activeLabel = useMemo(
     () => TABS.find((t) => t.filter === filter)?.label ?? 'Todos',

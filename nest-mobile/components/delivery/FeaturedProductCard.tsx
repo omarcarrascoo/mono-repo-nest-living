@@ -29,7 +29,7 @@ export const FeaturedProductCard: React.FC<FeaturedProductCardProps> = ({
   return (
     <TouchableOpacity activeOpacity={0.9} style={styles.card} onPress={onPress}>
       <ImageBackground
-        source={{ uri: product.image }}
+        source={product.image ? { uri: product.image } : undefined}
         style={styles.image}
         imageStyle={styles.imageInner}
       >

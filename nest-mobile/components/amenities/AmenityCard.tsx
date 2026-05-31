@@ -24,7 +24,12 @@ export const AmenityCard = ({ item, onPress }: AmenityCardProps) => {
     <TouchableOpacity activeOpacity={0.9} style={styles.card} onPress={onPress}>
         {/* Imagen + Badges */}
         <View style={styles.imageWrapper}>
-            <Image source={{ uri: item.image }} style={styles.cardImage} contentFit="cover" transition={500} />
+            <Image
+              source={item.image ? { uri: item.image } : undefined}
+              style={styles.cardImage}
+              contentFit="cover"
+              transition={500}
+            />
             
             <View style={styles.cardOverlay}>
                 <View style={styles.ratingBadge}>

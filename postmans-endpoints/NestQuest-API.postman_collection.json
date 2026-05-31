@@ -2,13 +2,13 @@
 	"info": {
 		"name": "NestQuest API",
 		"_postman_id": "f5b2c4d8-6a3e-4f9c-b7d1-1c8a5e9f2a4b",
-		"description": "Mapa completo de endpoints del backend `fly-api` (NestJS).\n\n## Cómo usar\n1. Importa esta colección y el environment `NestQuest-Local.postman_environment.json`.\n2. Selecciona el environment `NestQuest Local` arriba a la derecha.\n3. Ejecuta `Auth → POST /auth/register` (solo la primera vez) para crear un usuario admin.\n4. Ejecuta `Auth → POST /auth/login` — el `access_token` se guarda automáticamente en `{{accessToken}}`.\n5. El resto de endpoints usan ese token vía Bearer Auth a nivel de carpeta.\n\n## Variables\n- `baseUrl` — URL del backend (default `http://localhost:3000`).\n- `accessToken` — JWT, se llena automáticamente al hacer login.\n- `amenityId` — ID de amenidad, se llena automáticamente al crear o listar.\n- `categoryId` — ID de categoría, se llena automáticamente al crear o listar.\n- `reservationId` — ID de reserva, se llena automáticamente al crear o listar.\n- `userId` — ID del usuario logueado, se llena al consultar `/users/me`.\n- `residencyId` — Residencia del usuario logueado, se llena al consultar `/users/me`.\n\n## Regla de oro\nCada vez que se agrega/modifica un endpoint en `fly-api/`, esta colección **debe** actualizarse en el mismo cambio. Ver `fly-api/CLAUDE.md`.",
+		"description": "Mapa completo de endpoints del backend `fly-api` (NestJS).\n\n## Cómo usar\n1. Importa esta colección y los environments (`NestQuest-Render` y `NestQuest-Local`).\n2. Selecciona el environment `NestQuest Render` (default) o `NestQuest Local` arriba a la derecha.\n3. Ejecuta `Auth → POST /auth/register` (solo la primera vez) para crear un usuario admin.\n4. Ejecuta `Auth → POST /auth/login` — el `access_token` se guarda automáticamente en `{{accessToken}}`.\n5. El resto de endpoints usan ese token vía Bearer Auth a nivel de carpeta.\n\n## Variables\n- `baseUrl` — URL del backend (default deploy: `https://mono-repo-nest-living.onrender.com`; usa el env `NestQuest Local` para apuntar a localhost).\n- `accessToken` — JWT, se llena automáticamente al hacer login.\n- `amenityId` — ID de amenidad, se llena automáticamente al crear o listar.\n- `categoryId` — ID de categoría, se llena automáticamente al crear o listar.\n- `reservationId` — ID de reserva, se llena automáticamente al crear o listar.\n- `userId` — ID del usuario logueado, se llena al consultar `/users/me`.\n\n## Regla de oro\nCada vez que se agrega/modifica un endpoint en `fly-api/`, esta colección **debe** actualizarse en el mismo cambio. Ver `fly-api/CLAUDE.md`.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
 		{
 			"key": "baseUrl",
-			"value": "http://localhost:3000",
+			"value": "https://mono-repo-nest-living.onrender.com",
 			"type": "string"
 		},
 		{

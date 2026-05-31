@@ -48,18 +48,48 @@ export function usePushRegistration() {
     };
   }, [status, registeredToken, registerToken]);
 
-  // Listener de taps → deep link
+  // Foreground listener: cuando llega un push con la app abierta, refresca el
+  // inbox + badge para que el icono del bell y la pantalla /notifications se
+  // actualicen sin tener que jalar manualmente.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const sub = Notifications.addNotificationReceivedListener(() => {
+      const store = useNotificationsStore.getState();
+      void store.fetchUnreadCount();
+      if (store.loadedAt) void store.refreshInbox();
+    });
+    return () => sub.remove();
+  }, [status]);
+
+  // Listener de taps → deep link + mark-as-read
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data ?? {};
+      const notificationId =
+        typeof data.notificationId === 'string' ? data.notificationId : undefined;
       const reservationId =
         typeof data.reservationId === 'string' ? data.reservationId : undefined;
       const amenityId =
         typeof data.amenityId === 'string' ? data.amenityId : undefined;
+      const orderId =
+        typeof data.orderId === 'string' ? data.orderId : undefined;
+      const postId =
+        typeof data.postId === 'string' ? data.postId : undefined;
+
+      if (notificationId) {
+        void useNotificationsStore.getState().markRead(notificationId);
+      }
+
       if (reservationId) {
         router.push(`/reservation/${reservationId}`);
+      } else if (orderId) {
+        router.push(`/orders/${orderId}`);
+      } else if (postId) {
+        router.push(`/post/${postId}`);
       } else if (amenityId) {
         router.push(`/amenity/${amenityId}`);
+      } else {
+        router.push('/notifications');
       }
     });
     return () => sub.remove();

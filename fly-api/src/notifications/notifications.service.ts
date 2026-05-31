@@ -97,7 +97,11 @@ export class NotificationsService {
       sound: 'default',
       title: payload.title,
       body: payload.body,
-      data: { ...payload.data, kind: payload.kind },
+      data: {
+        ...payload.data,
+        kind: payload.kind,
+        notificationId: String(log._id),
+      },
       priority: 'high',
     }));
 

@@ -1,6 +1,12 @@
 import { create } from 'zustand';
+import * as Notifications from 'expo-notifications';
 import { Notification } from '@/types/api';
 import { notificationsService } from '@/services/notifications.service';
+
+/** Empuja el contador al badge del icono de la app (iOS principalmente). */
+function syncOsBadge(count: number) {
+  void Notifications.setBadgeCountAsync(Math.max(0, count)).catch(() => {});
+}
 
 interface NotificationsState {
   // Push token registration (existing)
@@ -87,6 +93,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
         loading: false,
         loadedAt: Date.now(),
       });
+      syncOsBadge(count);
     } catch (e: any) {
       set({ loading: false, inboxError: e?.message ?? 'No pudimos cargar tus notificaciones' });
     }
@@ -99,6 +106,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
         notificationsService.listMine(),
         notificationsService.unreadCount(),
       ]);
+      syncOsBadge(count);
       set({
         items,
         unreadCount: count,
@@ -114,6 +122,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
     try {
       const count = await notificationsService.unreadCount();
       set({ unreadCount: count });
+      syncOsBadge(count);
     } catch {
       // silent — only afecta el badge
     }
@@ -122,16 +131,19 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   markRead: async (id) => {
     const before = get().items;
     const wasUnread = before.find((n) => n.id === id && !n.read);
-    set((s) => ({
-      items: s.items.map((n) =>
-        n.id === id ? { ...n, read: true, readAt: new Date().toISOString() } : n,
-      ),
-      unreadCount: wasUnread ? Math.max(s.unreadCount - 1, 0) : s.unreadCount,
-    }));
+    set((s) => {
+      const nextCount = wasUnread ? Math.max(s.unreadCount - 1, 0) : s.unreadCount;
+      syncOsBadge(nextCount);
+      return {
+        items: s.items.map((n) =>
+          n.id === id ? { ...n, read: true, readAt: new Date().toISOString() } : n,
+        ),
+        unreadCount: nextCount,
+      };
+    });
     try {
       await notificationsService.markRead(id);
     } catch {
-      // si falla revertimos
       set({ items: before });
       void get().fetchUnreadCount();
     }
@@ -146,14 +158,17 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       ),
       unreadCount: 0,
     }));
+    syncOsBadge(0);
     try {
       await notificationsService.markAllRead();
     } catch {
       set({ items: before, unreadCount: beforeCount });
+      syncOsBadge(beforeCount);
     }
   },
 
-  reset: () =>
+  reset: () => {
+    syncOsBadge(0);
     set({
       registeredToken: null,
       registering: false,
@@ -164,5 +179,6 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       refreshing: false,
       inboxError: null,
       loadedAt: null,
-    }),
+    });
+  },
 }));

@@ -4,20 +4,21 @@ Mapa fuente de verdad de **todos** los endpoints expuestos por el backend `fly-a
 
 ## Archivos
 
-- `NestQuest-API.postman_collection.json` — Colección con todos los endpoints organizados por carpeta (Root / Auth / Users / Amenities). Incluye scripts de test que capturan automáticamente `accessToken`, `userId`, `residencyId` y `amenityId` en variables de la colección.
-- `NestQuest-Local.postman_environment.json` — Environment con variables para correr todo contra `http://localhost:3000`.
+- `NestQuest-API.postman_collection.json` — Colección con todos los endpoints organizados por carpeta (Auth / Users / Clubs / Amenities / etc.). Incluye scripts de test que capturan automáticamente `accessToken`, `userId`, `clubId`, `joinCode`, `membershipId`, `amenityId` en variables.
+- `NestQuest-Render.postman_environment.json` — Environment apuntando al deploy en `https://mono-repo-nest-living.onrender.com` (default recomendado).
+- `NestQuest-Local.postman_environment.json` — Environment apuntando a `http://localhost:3000` para desarrollo con backend en tu máquina.
 
 ## Setup rápido
 
 1. Abre Postman.
-2. **File → Import** y arrastra los dos JSON de esta carpeta.
-3. En la esquina superior derecha selecciona el environment **NestQuest Local**.
-4. Asegúrate de que el backend esté corriendo:
+2. **File → Import** y arrastra los tres JSON de esta carpeta.
+3. En la esquina superior derecha selecciona **NestQuest Render** (default) o **NestQuest Local** si tienes el backend corriendo en tu máquina.
+4. Si vas por **Local**, asegúrate de que el backend esté corriendo:
    ```bash
    cd fly-api
    npm run start:dev
    ```
-5. Confirma que `MONGO_URI`, `JWT_SECRET` y `JWT_EXPIRES_IN` estén configurados en `fly-api/.env`.
+   Y confirma que `MONGO_URI`, `JWT_SECRET` y `JWT_EXPIRES_IN` estén configurados en `fly-api/.env`.
 
 ## Flujo de prueba sugerido
 

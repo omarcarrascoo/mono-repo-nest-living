@@ -1,0 +1,375 @@
+@import "tailwindcss";
+
+/* ============================================================
+ * NestQuest — Design tokens
+ * Portados desde nest-mobile/constants/theme.ts (estética Earth/Forest Green).
+ * Dos caras coherentes con la app:
+ *   - Landing + login: oscuro e inmersivo (orbs, glass, imágenes grandes).
+ *   - Dashboard: claro y profesional (cards blancas, acento teal).
+ * ============================================================ */
+
+@theme {
+  /* Marca */
+  --color-teal: #2dd4bf;
+  --color-teal-dark: #0f766e;
+  --color-teal-deep: #115e59;
+  --color-cyan: #155e75;
+  --color-lime: #4ade80;
+  --color-emerald: #10b981;
+
+  /* Fondos oscuros (forest) */
+  --color-forest: #242f36;
+  --color-forest-ink: #111a20;
+  --color-forest-night: #0c1c18;
+
+  /* Texto sobre oscuro */
+  --color-mist: #f1f8f6;
+  --color-mist-soft: #bccbc6;
+  --color-mist-label: #8da399;
+
+  /* Superficie clara (dashboard) */
+  --color-canvas: #f6f8f7;
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+  --color-ink-soft: #64748b;
+  --color-line: #e2e8f0;
+
+  /* Editorial (landing + login) — blanco con tinta cálida casi negra */
+  --color-paper: #ffffff;
+  --color-paper-2: #f7f6f2; /* panel cálido alterno */
+  --color-editorial-ink: #1b1a17;
+  --color-editorial-soft: #6f6e66;
+  --color-hairline: #e7e5de;
+
+  /* Estado */
+  --color-ok: #34d399;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+  --color-danger-strong: #dc2626;
+
+  /* Radios — coherentes con el móvil (16–32px) */
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+
+  /* Tipografía */
+  --font-sans:
+    var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  /* Serif editorial para titulares de display */
+  --font-serif:
+    var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+}
+
+/* ---- Base ---- */
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+/* Scrollbar discreto en superficies oscuras */
+.dark-scope {
+  color-scheme: dark;
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.28);
+  color: #f1f8f6;
+}
+
+/* ============================================================
+ * Utilidades compartidas (las usa landing, login y dashboard)
+ * ============================================================ */
+
+/* Fondo "forest": degradado profundo verde bosque para hero/login */
+.bg-forest-gradient {
+  background:
+    radial-gradient(
+      120% 120% at 80% -10%,
+      rgba(45, 212, 191, 0.18) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      90% 90% at 0% 110%,
+      rgba(17, 94, 89, 0.55) 0%,
+      transparent 60%
+    ),
+    linear-gradient(180deg, #142028 0%, #0c1c18 100%);
+}
+
+/* Orbs difusos — eco de GRADIENTS.blueOrb / greenOrb del móvil */
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.orb-lime {
+  background: radial-gradient(circle, #4ade80 0%, #10b981 45%, transparent 70%);
+}
+.orb-forest {
+  background: radial-gradient(circle, #115e59 0%, #042f2e 50%, transparent 72%);
+}
+
+/* Glassmorphism (background.glass del móvil) */
+.glass {
+  background: rgba(20, 28, 40, 0.45);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.glass-light {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* Botón primario — gradiente buttonPrimary del móvil */
+.btn-primary {
+  background: linear-gradient(90deg, #1b7b8c 0%, #0f766e 100%);
+  color: #fff;
+  box-shadow: 0 10px 30px -10px rgba(15, 118, 110, 0.6);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 36px -12px rgba(15, 118, 110, 0.7);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+.btn-primary:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+
+/* Texto con degradado teal→lima para acentos del hero */
+.text-gradient-teal {
+  background: linear-gradient(120deg, #5eead4 0%, #4ade80 60%, #10b981 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Animación sutil de entrada */
+@keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-float-up {
+  animation: float-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(20px, -24px) scale(1.06);
+  }
+}
+.animate-drift {
+  animation: drift 14s ease-in-out infinite;
+}
+
+/* Imagen del hero: zoom lentísimo (Ken Burns) para añadir vida sin distraer */
+@keyframes hero-zoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.07);
+  }
+}
+.hero-image {
+  animation: hero-zoom 18s ease-out forwards;
+}
+
+/* Cue de scroll que pulsa */
+@keyframes scroll-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+    transform-origin: top;
+    opacity: 0.4;
+  }
+  50% {
+    transform: scaleY(1);
+    transform-origin: top;
+    opacity: 1;
+  }
+}
+.scroll-cue {
+  animation: scroll-pulse 2.4s ease-in-out infinite;
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-up,
+  .animate-drift,
+  .hero-image,
+  .scroll-cue {
+    animation: none;
+  }
+}
+
+/* ============================================================
+ * Editorial (landing + login) — fondo blanco, estilo revista
+ * ============================================================ */
+
+.font-display {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+/* Eyebrow / kicker: etiqueta pequeña en versalitas con guía */
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-editorial-soft);
+}
+
+/* Línea fina editorial */
+.hairline {
+  border-color: var(--color-hairline);
+}
+
+/* Capitular (drop cap) para el primer párrafo de un bloque */
+.dropcap::first-letter {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  float: left;
+  font-size: 3.6em;
+  line-height: 0.78;
+  padding: 0.06em 0.12em 0 0;
+  color: var(--color-teal-dark);
+}
+
+/* Número de índice tipo sumario de revista */
+.index-num {
+  font-family: var(--font-serif);
+  font-variant-numeric: tabular-nums;
+  font-weight: 300;
+  color: var(--color-teal-dark);
+}
+
+/* Botón sólido tinta para fondo claro (CTA editorial) */
+.btn-ink {
+  background: var(--color-editorial-ink);
+  color: #fff;
+  transition:
+    transform 0.15s ease,
+    background 0.2s ease,
+    opacity 0.2s ease;
+}
+.btn-ink:hover {
+  background: #000;
+  transform: translateY(-1px);
+}
+.btn-ink:disabled {
+  opacity: 0.5;
+  transform: none;
+  cursor: not-allowed;
+}
+
+/* Enlace con subrayado fino que crece al hover */
+.link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 1px;
+  padding-bottom: 1px;
+  transition: background-size 0.25s ease;
+}
+.link-underline:hover {
+  background-size: 100% 2px;
+}
+
+/* Botón claro sobre fondo oscuro (CTA en franjas tinta) */
+.btn-paper {
+  background: var(--color-paper);
+  color: var(--color-editorial-ink);
+  transition:
+    transform 0.15s ease,
+    opacity 0.2s ease;
+}
+.btn-paper:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+
+/* Regla numerada de lista editorial con guion al inicio */
+.rule-list > li {
+  position: relative;
+  padding-left: 1.6rem;
+}
+.rule-list > li::before {
+  content: "—";
+  position: absolute;
+  left: 0;
+  color: var(--color-teal-dark);
+}
+
+/* Input editorial: solo línea inferior, sin caja */
+.input-line {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-hairline);
+  border-radius: 0;
+  padding: 0.65rem 0;
+  font-size: 1.05rem;
+  color: var(--color-editorial-ink);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.input-line::placeholder {
+  color: var(--color-editorial-soft);
+}
+.input-line:focus {
+  border-bottom-color: var(--color-editorial-ink);
+}
+
+/* Input editorial del dashboard. Estilo "papel cálido" sobre fondo paper-2,
+ * borde 1px hairline en reposo, foco con tinta. Sin radios redondas. */
+.input {
+  width: 100%;
+  height: 3rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-hairline);
+  background: var(--color-paper);
+  padding-inline: 0.875rem;
+  font-size: 15px;
+  color: var(--color-editorial-ink);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.input::placeholder {
+  color: var(--color-editorial-soft);
+}
+.input:focus {
+  border-color: var(--color-editorial-ink);
+}

@@ -20,7 +20,7 @@ export const DetailHero = ({ amenity, onBack }: DetailHeroProps) => {
   return (
     <View style={styles.container}>
       <Image
-        source={{ uri: amenity.image ?? '' }}
+        source={amenity.image ? { uri: amenity.image } : undefined}
         style={styles.image}
         contentFit="cover"
         transition={300}

@@ -24,6 +24,7 @@ import { useDeliveryStore } from '@/stores/delivery-store';
 import { cartSelectors, useCartStore } from '@/stores/cart-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { useNotificationsStore } from '@/stores/notifications-store';
+import { useUnreadBadge } from '@/hooks/use-unread-badge';
 
 export default function DeliveryScreen() {
   const router = useRouter();
@@ -45,19 +46,15 @@ export default function DeliveryScreen() {
   const addProduct = useCartStore((s) => s.addProduct);
 
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
-  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+  useUnreadBadge();
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
-    if (isAdmin) {
-      void fetchUnreadCount();
-      return;
-    }
+    if (isAdmin) return;
     void fetchAll();
-    void fetchUnreadCount();
-  }, [isAdmin, fetchAll, fetchUnreadCount]);
+  }, [isAdmin, fetchAll]);
 
   useEffect(() => {
     if (isAdmin) return;

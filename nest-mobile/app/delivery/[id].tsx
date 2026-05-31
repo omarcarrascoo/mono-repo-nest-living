@@ -160,7 +160,10 @@ export default function ProductDetailScreen() {
         >
           {/* Hero image */}
           <View style={styles.hero}>
-            <Image source={{ uri: product.image }} style={styles.heroImage} />
+            <Image
+              source={product.image ? { uri: product.image } : undefined}
+              style={styles.heroImage}
+            />
             <LinearGradient colors={[...GRADIENTS.bottomFade]} style={styles.heroGradient} />
 
             <TouchableOpacity

@@ -23,6 +23,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useCategoriesStore } from '@/stores/categories-store';
 import { useFavoritesStore } from '@/stores/favorites-store';
 import { useNotificationsStore } from '@/stores/notifications-store';
+import { useUnreadBadge } from '@/hooks/use-unread-badge';
 import { Amenity } from '@/types/api';
 
 function toCard(item: Amenity): AmenityItem {
@@ -57,7 +58,7 @@ export default function UnifiedAmenitiesScreen() {
   const hydrateFavorites = useFavoritesStore((s) => s.hydrate);
 
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
-  const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
+  useUnreadBadge();
 
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
@@ -80,22 +81,11 @@ export default function UnifiedAmenitiesScreen() {
   });
 
   useEffect(() => {
-    if (isAdmin) {
-      void fetchUnreadCount();
-      return;
-    }
+    if (isAdmin) return;
     void fetchAll();
     void fetchCategories();
     if (!favoritesLoaded) void hydrateFavorites();
-    void fetchUnreadCount();
-  }, [
-    isAdmin,
-    fetchAll,
-    fetchCategories,
-    favoritesLoaded,
-    hydrateFavorites,
-    fetchUnreadCount,
-  ]);
+  }, [isAdmin, fetchAll, fetchCategories, favoritesLoaded, hydrateFavorites]);
 
   useEffect(() => {
     if (isAdmin) return;
